@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Logotipo Internet Perla</title>
+  <desc id="desc">Símbolo Wi-Fi verde con punto inferior sobre fondo blanco</desc>
+  <rect width="256" height="256" rx="36" fill="#f0fff3" />
+  <g fill="#0b6b1f">
+    <path d="M128 36c-46.5 0-90 18-122.8 50.8L28 109.6C57.5 79.9 91.3 65 128 65s70.5 14.9 100 44.6l22.8-22.8C218 54 174.5 36 128 36Z" />
+    <path d="M128 98c-32 0-62 11.9-84.8 34.7l23 23c16.7-16.7 37.3-25.3 61.8-25.3s45.1 8.6 61.8 25.3l23-23C190 109.9 160 98 128 98Z" />
+    <path d="M128 156.6c-19.5 0-37 7.3-50.8 21.1l23.4 23.4c7.6-7.4 17.1-11.5 27.4-11.5s19.8 4.1 27.4 11.5l23.4-23.4c-13.8-13.8-31.3-21.1-50.8-21.1Z" />
+    <circle cx="128" cy="216" r="18" />
+  </g>
+</svg>

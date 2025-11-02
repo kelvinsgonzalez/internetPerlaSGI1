@@ -1,0 +1,13 @@
+                    onChange={(e) => setEditing({ ...editing, email: e.target.value })}
+                  />
+                </div>
+                <div className="relative">
+                  <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-400" />
+                  <input
+                    className="w-full rounded-full border border-emerald-200/70 bg-white px-9 py-2 text-sm shadow-inner focus:border-emerald-400 focus:outline-none"
+                    type="password"
+                    placeholder="Nueva contraseña (opcional)"
+                    value={editing.password}
+                    onChange={(e) => setEditing({ ...editing, password: e.target.value })}
+                  />
+                </div>

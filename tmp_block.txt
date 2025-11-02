@@ -1,0 +1,16 @@
+              {selectedCustomer && (
+                <div className="rounded-lg border border-slate-200 p-3 text-sm text-slate-600 bg-slate-100/50 space-y-1">
+                  <div>
+                    <span className="font-semibold text-slate-500">Dirección:</span>{" "}
+                    {selectedCustomer.direccion || "-"}
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500">Teléfono:</span>{" "}
+                    {selectedCustomer.telefono || "-"}
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500">IP asignada:</span>{" "}
+                    {selectedCustomer.ipAsignada ?? "-"}
+                  </div>
+                </div>
+              )}

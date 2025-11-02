@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_DATABASE:-internetperla}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - ip_db_data:/var/lib/postgresql/data
+  backend:
+    build: ./apps/backend
+    environment:
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_DATABASE: ${DB_DATABASE:-internetperla}
+      DB_SSL: ${DB_SSL:-false}
+      DB_SYNC: ${DB_SYNC:-true}
+      JWT_SECRET: ${JWT_SECRET:-supersecretjwt}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+    depends_on:
+      - db
+    ports:
+      - "3000:3000"
+    volumes:
+      - uploads:/app/uploads
+  frontend:
+    build: ./apps/frontend
+    environment:
+      VITE_API_URL: http://localhost:3000/api/v1
+      VITE_SOCKET_URL: http://localhost:3000
+    depends_on:
+      - backend
+    ports:
+      - "3001:5173"
+    command: npm run preview
+    volumes:
+      - ./apps/frontend/src:/app/src
+volumes:
+  ip_db_data:
+  uploads:

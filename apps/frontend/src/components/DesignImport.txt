@@ -1,0 +1,3 @@
+Nota: Los componentes de diseño originales se conservaron en "InternetPerla App and Admin System/src/components".
+Esta app reutiliza la estética (tipografía Montserrat y color primario) y está lista para integrar esos componentes si se desean combinar.
+

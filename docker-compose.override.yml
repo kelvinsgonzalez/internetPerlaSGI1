@@ -1,0 +1,25 @@
+services:
+  frontend:
+    # Ejecutar frontend en modo desarrollo (Vite) con hot reload
+    image: node:20
+    build: null
+    command:
+      ["sh", "-lc", "npm install && npm run dev -- --host 0.0.0.0 --port 5173"]
+    working_dir: /workspace/apps/frontend
+    volumes:
+      - ./:/workspace:cached
+    environment:
+      NODE_ENV: development
+      # Forzar polling para detección de cambios fiable sobre montajes en Docker (Windows/Mac)
+      CHOKIDAR_USEPOLLING: "true"
+      VITE_API_URL: http://localhost:3000/api/v1
+    ports:
+      - "3001:5173"
+
+  db:
+    ports:
+      - "${DB_PORT:-5432}:5432"
+
+volumes:
+  uploads:
+    external: false

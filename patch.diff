@@ -1,0 +1,8 @@
+*** Begin Patch
+*** Update File: apps/backend/src/modules/tasks/task.entity.ts
+@@
+-  @ManyToOne(() => User, { eager: true, nullable: false }) assignedTo: User;
+-  @ManyToOne(() => User, { eager: true, nullable: false }) createdBy: User;
++  @ManyToOne(() => User, { eager: true, nullable: true, onDelete: 'SET NULL' }) assignedTo: User;
++  @ManyToOne(() => User, { eager: true, nullable: true, onDelete: 'SET NULL' }) createdBy: User;
+*** End Patch
