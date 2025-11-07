@@ -1,34 +1,37 @@
-services:
-  db:
-    image: postgres:15-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${DB_USERNAME:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_DATABASE:-internetperla}
-    ports:
-      - "${DB_PORT:-5434}:5432"
-    volumes:
-      - ip_db_data:/var/lib/postgresql/data
+  # Base de datos local (comentada para usar Supabase)
+  # db:
+  #   image: postgres:15-alpine
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_USER: ${DB_USERNAME:-postgres}
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+  #     POSTGRES_DB: ${DB_DATABASE:-internetperla}
+  #   ports:
+  #     - "${DB_PORT:-5434}:5432"
+  #   volumes:
+  #     - ip_db_data:/var/lib/postgresql/data
   backend:
     build: ./apps/backend
     environment:
       PORT: 3000
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_USERNAME: ${DB_USERNAME:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres}
-      DB_DATABASE: ${DB_DATABASE:-internetperla}
-      DB_SSL: ${DB_SSL:-false}
-      DB_SYNC: ${DB_SYNC:-true}
+      # Configuración para Supabase (usar .env.supabase)
+      DB_HOST: ${SUPABASE_DB_HOST:-db.your-project.supabase.co}
+      DB_PORT: ${SUPABASE_DB_PORT:-5432}
+      DB_USERNAME: ${SUPABASE_DB_USERNAME:-postgres}
+      DB_PASSWORD: ${SUPABASE_DB_PASSWORD:-your-password}
+      DB_DATABASE: ${SUPABASE_DB_NAME:-postgres}
+      DB_SSL: ${SUPABASE_DB_SSL:-true}
+      DB_SYNC: ${DB_SYNC:-false}
       JWT_SECRET: ${JWT_SECRET:-supersecretjwt}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
-    depends_on:
-      - db
+    # depends_on:
+    #   - db  # Comentado porque usamos Supabase
     ports:
       - "3003:3000"
     volumes:
       - uploads:/app/uploads
+    env_file:
+      - .env.supabase  # Cargar variables de Supabase
   frontend:
     build: ./apps/frontend
     environment:
@@ -41,6 +44,8 @@ services:
     command: npm run preview
     volumes:
       - ./apps/frontend/src:/app/src
+    env_file:
+      - .env.supabase  # Cargar variables de Supabase
 volumes:
-  ip_db_data:
+  # ip_db_data:  # Comentado porque usamos Supabase
   uploads:
