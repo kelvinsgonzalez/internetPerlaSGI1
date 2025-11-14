@@ -1,1 +1,0 @@
-﻿INSERT INTO "user" (id, email, password_hash, role, name, "isBlocked") VALUES (gen_random_uuid(), 'admin@internetperla.com', '$2a$10$/uFVDxhdBjMKLrXDrUv1HuCLeOZSJyGZ39w6FkUFwUkEQc23rzNli', 'ADMIN', 'Administrador', false);
