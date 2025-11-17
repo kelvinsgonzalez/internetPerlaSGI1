@@ -1,0 +1,13 @@
+He revisado `apps/frontend/src/services/api.ts`. El código ya está configurado para priorizar `import.meta.env.VITE_API_URL` o `import.meta.env.VITE_API_BASE_URL`. La opción de reserva a `window.location.hostname:3000` solo ocurrirá si estas variables de entorno no están configuradas.
+
+Para asegurar que tu frontend se conecte a la API de backend correcta en Render, necesitas configurar la variable de entorno `VITE_API_URL` en la configuración de tu servicio en Render. Esto anulará la opción de reserva local.
+
+**Instrucciones para Render:**
+
+1.  Ve a tu servicio de frontend en Render.
+2.  Navega a "Environment" o "Environment Variables" en la configuración.
+3.  Agrega una nueva variable de entorno:
+    *   **Clave:** `VITE_API_URL`
+    *   **Valor:** La URL completa de tu API de backend desplegada (por ejemplo, `https://tu-servicio-backend.onrender.com/api/v1`).
+
+Una vez que esta variable de entorno esté configurada, tu frontend la utilizará para realizar llamadas a la API, evitando cualquier URL de `localhost` o específica de desarrollo en producción.

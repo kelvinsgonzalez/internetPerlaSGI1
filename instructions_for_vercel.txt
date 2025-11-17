@@ -1,0 +1,16 @@
+Entendido, tu frontend está en Vercel. Las instrucciones son similares, pero adaptadas a la plataforma de Vercel.
+
+Para asegurar que tu frontend se conecte a la API de backend correcta en Vercel, necesitas configurar la variable de entorno `VITE_API_URL` en la configuración de tu proyecto en Vercel.
+
+**Instrucciones para Vercel:**
+
+1.  Ve a tu Dashboard de Vercel y selecciona tu proyecto de frontend.
+2.  Navega a la pestaña "Settings" (Configuración).
+3.  En el menú lateral, haz clic en "Environment Variables" (Variables de Entorno).
+4.  Agrega una nueva variable de entorno:
+    *   **Name (Nombre):** `VITE_API_URL`
+    *   **Value (Valor):** La URL completa de tu API de backend desplegada (por ejemplo, `https://tu-servicio-backend.onrender.com/api/v1`).
+    *   Asegúrate de que esté disponible para los entornos de "Production", "Preview" y "Development" si lo necesitas.
+5.  Haz clic en "Add" (Agregar).
+
+Después de agregar la variable de entorno, Vercel reconstruirá tu proyecto (o puedes iniciar un nuevo despliegue manualmente) y el frontend utilizará la `VITE_API_URL` que has configurado para todas las llamadas a la API. Esto evitará cualquier URL de `localhost` o específica de desarrollo en producción.

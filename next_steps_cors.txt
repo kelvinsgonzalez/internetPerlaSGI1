@@ -1,0 +1,8 @@
+He actualizado el archivo `apps/backend/src/main.ts` para configurar CORS y permitir peticiones desde tu dominio de Vercel.
+
+**Siguientes pasos:**
+
+1.  **Haz `git push` a tu rama `main`** (o la rama que uses para desplegar en Render).
+2.  **Render detectará los cambios y volverá a hacer deploy automáticamente.** Si quieres forzarlo o limpiar la caché de construcción, puedes ir a tu servicio de backend en Render y seleccionar "Manual Deploy → Clear build cache & deploy".
+
+Con esto, tu backend debería aceptar las peticiones de tu frontend desplegado en Vercel.
