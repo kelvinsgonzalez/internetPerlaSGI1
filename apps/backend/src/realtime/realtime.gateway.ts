@@ -11,8 +11,19 @@ import { Server, Socket } from "socket.io";
 
 type JwtPayload = { sub: string; role?: "ADMIN" | "USER"; email?: string };
 
+// 👇 MISMO LISTADO QUE EN main.ts
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://iperla.netlify.app",
+];
+
 @Injectable()
-@WebSocketGateway({ cors: { origin: true } })
+@WebSocketGateway({
+  cors: {
+    origin: allowedOrigins,
+    credentials: true,
+  },
+})
 export class RealtimeGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
@@ -54,13 +65,18 @@ export class RealtimeGateway
     this.server?.to("role:ADMIN").emit(event, data);
   }
 
-  // Broadcast a message to all connected clients
   broadcastAll(event: string, data: any) {
     this.server?.emit(event, data);
   }
 
   public handleLocationUpdate(workerId: string, lat: number, lng: number) {
-    console.log(`Broadcasting location update for worker ${workerId}: ${lat}, ${lng}`);
-    this.broadcastToAdmins("worker-location-updated", { workerId, lat, lng });
+    console.log(
+      `Broadcasting location update for worker ${workerId}: ${lat}, ${lng}`,
+    );
+    this.broadcastToAdmins("worker-location-updated", {
+      workerId,
+      lat,
+      lng,
+    });
   }
 }
