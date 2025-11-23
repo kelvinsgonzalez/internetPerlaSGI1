@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan } from 'typeorm';
+import { Repository, MoreThan, LessThan } from 'typeorm';
 import { WorkerLocation } from './location.entity';
 
 @Injectable()
@@ -84,10 +84,10 @@ export class LocationService {
    * Elimina ubicaciones antiguas (limpieza de base de datos)
    * @param days Eliminar registros más antiguos que N días
    */
-  async deleteOldRecords(days: number = 30): Promise<any> {
-    const oldDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    return this.locationRepository.delete({
-      createdAt: MoreThan(oldDate),
-    });
-  }
+async deleteOldRecords(days: number = 30): Promise<any> {
+  const oldDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  return this.locationRepository.delete({
+    createdAt: LessThan(oldDate),
+  });
+}
 }

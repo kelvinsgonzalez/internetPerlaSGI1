@@ -1,6 +1,11 @@
-import { Controller, Post, Get, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, Query, Request } from '@nestjs/common';
+import { UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { LocationService } from './location.service';
+import { RolesGuard } from 'src/modules/auth/roles.guard';
+import { Roles } from 'src/modules/auth/roles.decorator';
+import { Role } from 'src/modules/users/user.entity';
+
 
 interface CreateLocationDto {
   lat: number;
