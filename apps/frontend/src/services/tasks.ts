@@ -78,3 +78,10 @@ export const archiveTask = (id: string) =>
 
 export const deleteTask = (id: string) =>
   api.delete(`/tasks/${id}`).then((r) => r.data);
+
+export const clearArchivedTasks = (before?: string) =>
+  api
+    .delete<{ deleted: number }>("/tasks/archived", {
+      params: before ? { before } : undefined,
+    })
+    .then((r) => r.data);
