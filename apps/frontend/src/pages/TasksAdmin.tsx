@@ -7,6 +7,7 @@ import { getCustomers } from "../services/customers";
 import {
   createTask,
   deleteTask,
+  archiveTask,
   listTasks,
   updateTask,
   type Task,
@@ -58,20 +59,21 @@ export default function TasksAdmin() {
   const [filterStatus, setFilterStatus] = useState<TaskStatus | "">("");
   const [filterAssignedTo, setFilterAssignedTo] = useState("");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [showLog, setShowLog] = useState(false);
 
   const { socket } = useSocket();
 
   const load = async () => {
+    const params: {
+      status?: TaskStatus;
+      assignedToId?: string;
+      archived?: boolean;
+    } = { archived: showLog };
+    if (filterStatus) params.status = filterStatus;
+    if (filterAssignedTo) params.assignedToId = filterAssignedTo;
     const [u, t] = await Promise.all([
       api.get("/users"),
-      listTasks(
-        filterStatus || filterAssignedTo
-          ? {
-              ...(filterStatus ? { status: filterStatus } : {}),
-              ...(filterAssignedTo ? { assignedToId: filterAssignedTo } : {}),
-            }
-          : undefined
-      ),
+      listTasks(params),
     ]);
     setUsers(u.data.value || u.data);
     setTasks(t as Task[]);
@@ -86,7 +88,7 @@ export default function TasksAdmin() {
 
   useEffect(() => {
     load(); // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterStatus, filterAssignedTo]);
+  }, [filterStatus, filterAssignedTo, showLog]);
 
   useEffect(() => {
     if (!socket) return;
@@ -181,6 +183,18 @@ export default function TasksAdmin() {
       toast.error(e?.response?.data?.message || "No se pudo actualizar");
     }
   };
+  const onArchive = async (id: string) => {
+    const prev = tasks.slice();
+    setTasks((curr) => curr.filter((t) => t.id !== id));
+    try {
+      await archiveTask(id);
+      toast.success("Tarea archivada");
+      await load();
+    } catch {
+      setTasks(prev);
+      toast.error("No se pudo archivar la tarea");
+    }
+  };
   const onReassign = async (id: string, newUserId: string) => {
     const prev = tasks.slice();
     const user = users.find((u) => u.id === newUserId);
@@ -240,6 +254,12 @@ export default function TasksAdmin() {
                 Tareas (Admin)
             </motion.h1>
             <div className="flex gap-2">
+            <button
+                onClick={() => setShowLog((prev) => !prev)}
+                className="inline-flex items-center rounded-full border border-emerald-500 px-4 py-2 text-sm font-semibold text-emerald-700 bg-white/70 shadow-sm hover:bg-emerald-50 transition"
+            >
+                {showLog ? "Volver a tareas" : "Ver log (completadas)"}
+            </button>
             <select
                 className="border rounded px-2 py-1"
                 value={filterAssignedTo}
@@ -265,7 +285,11 @@ export default function TasksAdmin() {
             </select>
             <button
                 onClick={() => setOpen(true)}
-                className="inline-flex items-center rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-600"
+                className={`inline-flex items-center rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-600 fixed bottom-5 right-5 z-30 sm:static sm:relative sm:bottom-auto sm:right-auto ${
+                  open
+                    ? "opacity-0 pointer-events-none sm:opacity-100 sm:pointer-events-auto"
+                    : ""
+                }`}
             >
                 ➕ Agregar tarea
             </button>
@@ -322,16 +346,18 @@ export default function TasksAdmin() {
                   <td className="p-3 relative text-slate-700">
                     <div className="flex items-center gap-2">
                       <span>{t.assignedTo?.name || t.assignedTo?.email}</span>
-                      <button
-                        className="text-xs text-emerald-600 hover:underline"
-                        onClick={() =>
-                          setReassignFor(reassignFor === t.id ? null : t.id)
-                        }
-                      >
-                        Reasignar
-                      </button>
+                      {!showLog && (
+                        <button
+                          className="text-xs text-emerald-600 hover:underline"
+                          onClick={() =>
+                            setReassignFor(reassignFor === t.id ? null : t.id)
+                          }
+                        >
+                          Reasignar
+                        </button>
+                      )}
                     </div>
-                    {reassignFor === t.id && (
+                    {!showLog && reassignFor === t.id && (
                       <div className="absolute z-10 mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow-lg p-2">
                         <div className="text-[11px] text-slate-500 mb-1">
                           Selecciona trabajador
@@ -360,22 +386,31 @@ export default function TasksAdmin() {
                       className={`inline-flex items-center gap-2 rounded-full px-2 py-0.5 text-xs font-semibold ${statusColors[t.status]}`}>
                       {t.status.replace("_", " ")}
                     </span>
-                    <div className="mt-1">
-                      <select
-                        className="bg-white/50 border border-slate-300 rounded px-2 py-1 text-xs text-slate-800"
-                        value={t.status}
-                        disabled={
-                          t.status === "COMPLETADA" || t.status === "OBJETADA"
-                        }
-                        onChange={(e) =>
-                          onChangeStatus(t.id, e.target.value as TaskStatus)
-                        }
-                      >
-                        <option value="PENDIENTE">Pendiente</option>
-                        <option value="EN_PROCESO">En proceso</option>
-                        <option value="COMPLETADA">Completada</option>
-                      </select>
-                    </div>
+                    {showLog ? (
+                      <div className="mt-1 text-[11px] text-slate-500">
+                        Archivada:{" "}
+                        {t.archivedAt
+                          ? new Date(t.archivedAt).toLocaleString()
+                          : "—"}
+                      </div>
+                    ) : (
+                      <div className="mt-1">
+                        <select
+                          className="bg-white/50 border border-slate-300 rounded px-2 py-1 text-xs text-slate-800"
+                          value={t.status}
+                          disabled={
+                            t.status === "COMPLETADA" || t.status === "OBJETADA"
+                          }
+                          onChange={(e) =>
+                            onChangeStatus(t.id, e.target.value as TaskStatus)
+                          }
+                        >
+                          <option value="PENDIENTE">Pendiente</option>
+                          <option value="EN_PROCESO">En proceso</option>
+                          <option value="COMPLETADA">Completada</option>
+                        </select>
+                      </div>
+                    )}
                   </td>
                   <td
                     className="p-3 text-xs text-slate-600 max-w-xs truncate"
@@ -398,31 +433,61 @@ export default function TasksAdmin() {
                       : "-"}
                   </td>
                   <td className="p-3">
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() =>
-                          setExpanded((prev) => ({
-                            ...prev,
-                            [t.id]: !prev[t.id],
-                          }))
-                        }
-                        className="text-emerald-600 hover:underline text-xs"
-                      >
-                        {expanded[t.id] ? "Ocultar" : "Ver más..."}
-                      </button>
-                      <button
-                        onClick={() => onEdit(t)}
-                        className="text-sky-600 hover:underline text-xs"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => onDelete(t.id)}
-                        className="text-rose-600 hover:underline text-xs"
-                      >
-                        Eliminar
-                      </button>
-                    </div>
+                    {showLog ? (
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() =>
+                            setExpanded((prev) => ({
+                              ...prev,
+                              [t.id]: !prev[t.id],
+                            }))
+                          }
+                          className="text-emerald-600 hover:underline text-xs"
+                        >
+                          {expanded[t.id] ? "Ocultar" : "Ver más..."}
+                        </button>
+                        <button
+                          onClick={() => onDelete(t.id)}
+                          className="text-rose-600 hover:underline text-xs"
+                        >
+                          Eliminar (permanente)
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() =>
+                            setExpanded((prev) => ({
+                              ...prev,
+                              [t.id]: !prev[t.id],
+                            }))
+                          }
+                          className="text-emerald-600 hover:underline text-xs"
+                        >
+                          {expanded[t.id] ? "Ocultar" : "Ver más..."}
+                        </button>
+                        <button
+                          onClick={() => onEdit(t)}
+                          className="text-sky-600 hover:underline text-xs"
+                        >
+                          Editar
+                        </button>
+                        {t.status === "COMPLETADA" && (
+                          <button
+                            onClick={() => onArchive(t.id)}
+                            className="text-emerald-700 hover:underline text-xs"
+                          >
+                            Archivar
+                          </button>
+                        )}
+                        <button
+                          onClick={() => onDelete(t.id)}
+                          className="text-rose-600 hover:underline text-xs"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </motion.tr>
                 {expanded[t.id] && (
@@ -458,7 +523,7 @@ export default function TasksAdmin() {
             {tasks.length === 0 && (
               <tr>
                 <td className="p-4 text-center text-slate-500" colSpan={6}>
-                  Sin tareas para mostrar.
+                  {showLog ? "Sin tareas archivadas." : "Sin tareas para mostrar."}
                 </td>
               </tr>
             )}

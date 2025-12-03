@@ -57,6 +57,7 @@ export class TasksService {
     status?: string;
     assignedToId?: string;
     customerId?: string;
+    archived?: boolean;
   }) {
     const qb = this.tasks
       .createQueryBuilder("t")
@@ -66,6 +67,11 @@ export class TasksService {
       .leftJoinAndSelect("t.createdBy", "createdBy")
       .orderBy("t.createdAt", "DESC");
 
+    if (filters?.archived === undefined) {
+      qb.andWhere("t.archived = false");
+    } else {
+      qb.andWhere("t.archived = :archived", { archived: filters.archived });
+    }
     if (filters?.status)
       qb.andWhere("t.status = :status", { status: filters.status });
     if (filters?.assignedToId)
@@ -79,7 +85,7 @@ export class TasksService {
 
   listForUser(
     userId: string,
-    filters?: { status?: string; customerId?: string }
+    filters?: { status?: string; customerId?: string; archived?: boolean }
   ) {
     const qb = this.tasks
       .createQueryBuilder("t")
@@ -90,6 +96,11 @@ export class TasksService {
       .where("assignedTo.id = :uid", { uid: userId })
       .orderBy("t.createdAt", "DESC");
 
+    if (filters?.archived === undefined) {
+      qb.andWhere("t.archived = false");
+    } else {
+      qb.andWhere("t.archived = :archived", { archived: filters.archived });
+    }
     if (filters?.status)
       qb.andWhere("t.status = :status", { status: filters.status });
     if (filters?.customerId)
@@ -210,6 +221,24 @@ export class TasksService {
     return saved;
   }
 
+  async archiveTask(id: string) {
+    const task = await this.tasks.findOne({ where: { id } });
+    if (!task) throw new NotFoundException("Tarea no encontrada");
+    if (task.status !== "COMPLETADA") {
+      throw new BadRequestException(
+        "Solo se pueden archivar tareas completadas"
+      );
+    }
+    task.archived = true;
+    task.archivedAt = new Date();
+    const saved = await this.tasks.save(task);
+    if (saved.assignedTo?.id)
+      this.rt.emitToUser(saved.assignedTo.id, "task:updated", saved);
+    this.rt.broadcastToAdmins("task:updated", saved);
+    this.rt.broadcastAll("tasks:update", saved);
+    return saved;
+  }
+
   async remove(id: string) {
     const found = await this.tasks.findOne({ where: { id } });
     if (!found) throw new NotFoundException("Tarea no encontrada");
@@ -274,6 +303,8 @@ export class TasksService {
       comentarioFinal: (t as any).comentarioFinal ?? null,
       completedAt: (t as any).completedAt ?? null,
       proofUrl: (t as any).proofUrl ?? null,
+      archived: (t as any).archived ?? false,
+      archivedAt: (t as any).archivedAt ?? null,
     } as any;
   }
 }
