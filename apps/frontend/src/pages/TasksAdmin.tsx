@@ -36,12 +36,6 @@ const statusColors: Record<TaskStatus, string> = {
   COMPLETADA: "bg-emerald-200 text-emerald-800",
   OBJETADA: "bg-rose-200 text-rose-800",
 };
-const statusCardBg: Record<TaskStatus, string> = {
-  PENDIENTE: "bg-white",
-  EN_PROCESO: "bg-amber-50",
-  COMPLETADA: "bg-emerald-50",
-  OBJETADA: "bg-rose-50",
-};
 
 const glassCard = 'backdrop-blur-xl bg-white/80 shadow-xl shadow-emerald-100/60 border border-white/30';
 
@@ -250,24 +244,24 @@ export default function TasksAdmin() {
         <div className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 w-[140%] bg-[conic-gradient(from_180deg_at_50%_50%,rgba(16,185,129,0.12),rgba(14,165,233,0.08),rgba(16,185,129,0.12))] blur-3xl opacity-35" />
 
       <div className="relative z-10 flex flex-1 flex-col gap-8 overflow-hidden">
-        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <header className="flex items-center justify-between">
             <motion.h1
-                className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900"
+                className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl"
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
             >
                 Tareas (Admin)
             </motion.h1>
-            <div className="flex flex-col gap-2 md:flex-row md:items-center">
+            <div className="flex gap-2">
             <button
                 onClick={() => setShowLog((prev) => !prev)}
-                className="inline-flex items-center justify-center rounded-full border border-emerald-500 px-4 py-2 text-sm font-semibold text-emerald-700 bg-white/70 shadow-sm hover:bg-emerald-50 transition w-full md:w-auto"
+                className="inline-flex items-center rounded-full border border-emerald-500 px-4 py-2 text-sm font-semibold text-emerald-700 bg-white/70 shadow-sm hover:bg-emerald-50 transition"
             >
                 {showLog ? "Volver a tareas" : "Ver log (completadas)"}
             </button>
             <select
-                className="border rounded px-3 py-2 text-sm w-full md:w-48"
+                className="border rounded px-2 py-1"
                 value={filterAssignedTo}
                 onChange={(e) => setFilterAssignedTo(e.target.value)}
             >
@@ -279,7 +273,7 @@ export default function TasksAdmin() {
                 ))}
             </select>
             <select
-                className="border rounded px-3 py-2 text-sm w-full md:w-36"
+                className="border rounded px-2 py-1"
                 value={filterStatus}
                 onChange={(e) => setFilterStatus((e.target.value || "") as any)}
             >
@@ -289,425 +283,253 @@ export default function TasksAdmin() {
                 <option value="COMPLETADA">Completada</option>
                 <option value="OBJETADA">Objetada</option>
             </select>
+            <button
+                onClick={() => setOpen(true)}
+                className={`inline-flex items-center rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-600 fixed bottom-5 right-5 z-30 sm:static sm:relative sm:bottom-auto sm:right-auto ${
+                  open
+                    ? "opacity-0 pointer-events-none sm:opacity-100 sm:pointer-events-auto"
+                    : ""
+                }`}
+            >
+                ➕ Agregar tarea
+            </button>
             </div>
         </header>
-        <button
-            onClick={() => setOpen(true)}
-            className={`inline-flex items-center justify-center rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-600 fixed bottom-5 right-5 z-30 sm:static sm:relative sm:bottom-auto sm:right-auto ${
-              open
-                ? "opacity-0 pointer-events-none sm:opacity-100 sm:pointer-events-auto"
-                : ""
-            }`}
-        >
-            ➕ Agregar tarea
-        </button>
 
-      <motion.div
-        className={`${glassCard} rounded-3xl p-0 overflow-hidden hidden md:block`}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+      <motion.div 
+        className={`${glassCard} rounded-3xl p-0 overflow-auto`}
+        initial={{ opacity: 0, y: 20 }} 
+        animate={{ opacity: 1, y: 0 }} 
         transition={{ duration: 0.5, delay: 0.1 }}
       >
-        <div className="overflow-auto">
-          <table className="min-w-full text-sm text-slate-800">
-            <thead className="bg-black/5">
-              <tr className="text-left">
-                <th className="p-3 font-semibold text-slate-700">Cliente</th>
-                <th className="p-3 font-semibold text-slate-700">Dirección</th>
-                <th className="p-3 font-semibold text-slate-700">Asignado a</th>
-                <th className="p-3 font-semibold text-slate-700">Estado</th>
-                <th className="p-3 font-semibold text-slate-700">Comentario</th>
-                <th className="p-3 font-semibold text-slate-700">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tasks.map((t, i) => (
-                <>
-                  <motion.tr
-                    key={t.id}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.02 }}
-                    className={`border-t border-black/10 ${
-                      t.status === "COMPLETADA"
-                        ? "bg-green-100/50"
-                        : t.status === "OBJETADA"
-                        ? "bg-red-100/50"
-                        : ""
-                    }`}
-                  >
-                    <td className="p-3">
-                      <div className="font-medium flex items-center gap-2 text-slate-700">
-                        {(t.customer as any)?.nombreCompleto || "-"}
-                        {t.status === "OBJETADA" && (
-                          <span className="inline-flex items-center rounded px-1.5 py-0.5 bg-rose-500 text-white text-[10px] font-semibold">
-                            OBJETADA
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-slate-500">{t.title}</div>
-                    </td>
-                    <td className="p-3 text-slate-600">
-                      {(t.customer as any)?.direccion || "-"}
-                    </td>
-                    <td className="p-3 relative text-slate-700">
-                      <div className="flex items-center gap-2">
-                        <span>{t.assignedTo?.name || t.assignedTo?.email}</span>
-                        {!showLog && (
-                          <button
-                            className="text-xs text-emerald-600 hover:underline"
-                            onClick={() =>
-                              setReassignFor(reassignFor === t.id ? null : t.id)
-                            }
-                          >
-                            Reasignar
-                          </button>
-                        )}
-                      </div>
-                      {!showLog && reassignFor === t.id && (
-                        <div className="absolute z-10 mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow-lg p-2">
-                          <div className="text-[11px] text-slate-500 mb-1">
-                            Selecciona trabajador
-                          </div>
-                          <select
-                            className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 text-sm text-slate-800"
-                            defaultValue=""
-                            onChange={(e) =>
-                              e.target.value && onReassign(t.id, e.target.value)
-                            }
-                          >
-                            <option value="" disabled>
-                              Elegir…
-                            </option>
-                            {workerUsers.map((u) => (
-                              <option key={u.id} value={u.id}>
-                                {u.name || u.email}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+        <table className="min-w-full text-sm text-slate-800">
+          <thead className="bg-black/5">
+            <tr className="text-left">
+              <th className="p-3 font-semibold text-slate-700">Cliente</th>
+              <th className="p-3 font-semibold text-slate-700">Dirección</th>
+              <th className="p-3 font-semibold text-slate-700">Asignado a</th>
+              <th className="p-3 font-semibold text-slate-700">Estado</th>
+              <th className="p-3 font-semibold text-slate-700">Comentario</th>
+              <th className="p-3 font-semibold text-slate-700">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tasks.map((t, i) => (
+              <>
+                <motion.tr
+                  key={t.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.02 }}
+                  className={`border-t border-black/10 ${
+                    t.status === "COMPLETADA"
+                      ? "bg-green-100/50"
+                      : t.status === "OBJETADA"
+                      ? "bg-red-100/50"
+                      : ""
+                  }`}
+                >
+                  <td className="p-3">
+                    <div className="font-medium flex items-center gap-2 text-slate-700">
+                      {(t.customer as any)?.nombreCompleto || "-"}
+                      {t.status === "OBJETADA" && (
+                        <span className="inline-flex items-center rounded px-1.5 py-0.5 bg-rose-500 text-white text-[10px] font-semibold">
+                          OBJETADA
+                        </span>
                       )}
-                    </td>
-                    <td className="p-3">
-                      <span
-                        className={`inline-flex items-center gap-2 rounded-full px-2 py-0.5 text-xs font-semibold ${statusColors[t.status]}`}>
-                        {t.status.replace("_", " ")}
-                      </span>
-                      {showLog ? (
-                        <div className="mt-1 text-[11px] text-slate-500">
-                          Archivada:{" "}
-                          {t.archivedAt
-                            ? new Date(t.archivedAt).toLocaleString()
-                            : "—"}
-                        </div>
-                      ) : (
-                        <div className="mt-1">
-                          <select
-                            className="bg-white/50 border border-slate-300 rounded px-2 py-1 text-xs text-slate-800"
-                            value={t.status}
-                            disabled={
-                              t.status === "COMPLETADA" ||
-                              t.status === "OBJETADA"
-                            }
-                            onChange={(e) =>
-                              onChangeStatus(t.id, e.target.value as TaskStatus)
-                            }
-                          >
-                            <option value="PENDIENTE">Pendiente</option>
-                            <option value="EN_PROCESO">En proceso</option>
-                            <option value="COMPLETADA">Completada</option>
-                          </select>
-                        </div>
-                      )}
-                    </td>
-                    <td
-                      className="p-3 text-xs text-slate-600 max-w-xs truncate"
-                      title={
-                        (t.status === "COMPLETADA"
-                          ? t.comentarioFinal
-                          : t.motivoObjecion) || ""
-                      }
-                    >
-                      {t.status === "COMPLETADA"
-                        ? t.comentarioFinal
-                          ? t.comentarioFinal.length > 80
-                            ? t.comentarioFinal.slice(0, 80) + "…"
-                            : t.comentarioFinal
-                          : "-"
-                        : t.motivoObjecion
-                        ? t.motivoObjecion.length > 80
-                          ? t.motivoObjecion.slice(0, 80) + "…"
-                          : t.motivoObjecion
-                        : "-"}
-                    </td>
-                    <td className="p-3">
-                      {showLog ? (
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() =>
-                              setExpanded((prev) => ({
-                                ...prev,
-                                [t.id]: !prev[t.id],
-                              }))
-                            }
-                            className="text-emerald-600 hover:underline text-xs"
-                          >
-                            {expanded[t.id] ? "Ocultar" : "Ver más..."}
-                          </button>
-                          <button
-                            onClick={() => onDelete(t.id)}
-                            className="text-rose-600 hover:underline text-xs"
-                          >
-                            Eliminar (permanente)
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() =>
-                              setExpanded((prev) => ({
-                                ...prev,
-                                [t.id]: !prev[t.id],
-                              }))
-                            }
-                            className="text-emerald-600 hover:underline text-xs"
-                          >
-                            {expanded[t.id] ? "Ocultar" : "Ver más..."}
-                          </button>
-                          <button
-                            onClick={() => onEdit(t)}
-                            className="text-sky-600 hover:underline text-xs"
-                          >
-                            Editar
-                          </button>
-                          {t.status === "COMPLETADA" && (
-                            <button
-                              onClick={() => onArchive(t.id)}
-                              className="text-emerald-700 hover:underline text-xs"
-                            >
-                              Archivar
-                            </button>
-                          )}
-                          <button
-                            onClick={() => onDelete(t.id)}
-                            className="text-rose-600 hover:underline text-xs"
-                          >
-                            Eliminar
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </motion.tr>
-                  {expanded[t.id] && (
-                    <tr className="border-t border-black/10 bg-slate-100/50">
-                      <td className="p-4 text-slate-700" colSpan={6}>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                          <div>
-                            <div className="text-[11px] text-slate-500">Teléfono</div>
-                            <div className="font-medium">{(t.customer as any)?.telefono ?? "—"}</div>
-                          </div>
-                          <div>
-                            <div className="text-[11px] text-slate-500">Teléfono contacto</div>
-                            <div className="font-medium">{(t as any)?.telefonoContacto ?? "—"}</div>
-                          </div>
-                          <div>
-                            <div className="text-[11px] text-slate-500">IP</div>
-                            <div className="font-medium">{(t.customer as any)?.ipAsignada ?? "—"}</div>
-                          </div>
-                          <div>
-                            <div className="text-[11px] text-slate-500">Latitud</div>
-                            <div className="font-medium">{(t.customer as any)?.latitud ?? "—"}</div>
-                          </div>
-                          <div>
-                            <div className="text-[11px] text-slate-500">Longitud</div>
-                            <div className="font-medium">{(t.customer as any)?.longitud ?? "—"}</div>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </>
-              ))}
-              {tasks.length === 0 && (
-                <tr>
-                  <td className="p-4 text-center text-slate-500" colSpan={6}>
-                    {showLog ? "Sin tareas archivadas." : "Sin tareas para mostrar."}
+                    </div>
+                    <div className="text-xs text-slate-500">{t.title}</div>
                   </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </motion.div>
-
-      {/* Mobile cards */}
-      <div className="md:hidden space-y-3">
-        {tasks.map((t, i) => (
-          <motion.div
-            key={t.id}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.02 }}
-            className={`${statusCardBg[t.status]} rounded-2xl border border-slate-200/70 shadow-sm p-4`}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-slate-500">Cliente</div>
-                <div className="font-semibold text-slate-800">
-                  {(t.customer as any)?.nombreCompleto || "-"}
-                </div>
-                <div className="text-xs text-slate-500">{t.title}</div>
-              </div>
-              <span className={`inline-flex items-center gap-2 rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusColors[t.status]}`}>
-                {t.status.replace("_", " ")}
-              </span>
-            </div>
-
-            <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-slate-700">
-              <div className="flex items-start justify-between">
-                <span className="text-slate-500 text-xs">Dirección</span>
-                <span className="text-right">{(t.customer as any)?.direccion || "-"}</span>
-              </div>
-              <div className="flex items-start justify-between">
-                <span className="text-slate-500 text-xs">Asignado</span>
-                <div className="text-right">
-                  <div>{t.assignedTo?.name || t.assignedTo?.email}</div>
-                  {!showLog && (
-                    <button
-                      className="text-xs text-emerald-600 hover:underline"
-                      onClick={() =>
-                        setReassignFor(reassignFor === t.id ? null : t.id)
-                      }
-                    >
-                      Reasignar
-                    </button>
-                  )}
-                </div>
-              </div>
-              {!showLog && reassignFor === t.id && (
-                <div className="rounded-lg border border-slate-200 bg-white p-2">
-                  <div className="text-[11px] text-slate-500 mb-1">Selecciona trabajador</div>
-                  <select
-                    className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 text-sm text-slate-800"
-                    defaultValue=""
-                    onChange={(e) =>
-                      e.target.value && onReassign(t.id, e.target.value)
+                  <td className="p-3 text-slate-600">
+                    {(t.customer as any)?.direccion || "-"}
+                  </td>
+                  <td className="p-3 relative text-slate-700">
+                    <div className="flex items-center gap-2">
+                      <span>{t.assignedTo?.name || t.assignedTo?.email}</span>
+                      {!showLog && (
+                        <button
+                          className="text-xs text-emerald-600 hover:underline"
+                          onClick={() =>
+                            setReassignFor(reassignFor === t.id ? null : t.id)
+                          }
+                        >
+                          Reasignar
+                        </button>
+                      )}
+                    </div>
+                    {!showLog && reassignFor === t.id && (
+                      <div className="absolute z-10 mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow-lg p-2">
+                        <div className="text-[11px] text-slate-500 mb-1">
+                          Selecciona trabajador
+                        </div>
+                        <select
+                          className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 text-sm text-slate-800"
+                          defaultValue=""
+                          onChange={(e) =>
+                            e.target.value && onReassign(t.id, e.target.value)
+                          }
+                        >
+                          <option value="" disabled>
+                            Elegir…
+                          </option>
+                          {workerUsers.map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.name || u.email}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </td>
+                  <td className="p-3">
+                    <span
+                      className={`inline-flex items-center gap-2 rounded-full px-2 py-0.5 text-xs font-semibold ${statusColors[t.status]}`}>
+                      {t.status.replace("_", " ")}
+                    </span>
+                    {showLog ? (
+                      <div className="mt-1 text-[11px] text-slate-500">
+                        Archivada:{" "}
+                        {t.archivedAt
+                          ? new Date(t.archivedAt).toLocaleString()
+                          : "—"}
+                      </div>
+                    ) : (
+                      <div className="mt-1">
+                        <select
+                          className="bg-white/50 border border-slate-300 rounded px-2 py-1 text-xs text-slate-800"
+                          value={t.status}
+                          disabled={
+                            t.status === "COMPLETADA" || t.status === "OBJETADA"
+                          }
+                          onChange={(e) =>
+                            onChangeStatus(t.id, e.target.value as TaskStatus)
+                          }
+                        >
+                          <option value="PENDIENTE">Pendiente</option>
+                          <option value="EN_PROCESO">En proceso</option>
+                          <option value="COMPLETADA">Completada</option>
+                        </select>
+                      </div>
+                    )}
+                  </td>
+                  <td
+                    className="p-3 text-xs text-slate-600 max-w-xs truncate"
+                    title={
+                      (t.status === "COMPLETADA"
+                        ? t.comentarioFinal
+                        : t.motivoObjecion) || ""
                     }
                   >
-                    <option value="" disabled>
-                      Elegir…
-                    </option>
-                    {workerUsers.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name || u.email}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <div className="flex items-start justify-between">
-                <span className="text-slate-500 text-xs">Comentario</span>
-                <span className="text-right text-xs text-slate-600">
-                  {t.status === "COMPLETADA"
-                    ? t.comentarioFinal || "-"
-                    : t.motivoObjecion || "-"}
-                </span>
-              </div>
-              {showLog ? (
-                <div className="text-xs text-slate-500">
-                  Archivada:{" "}
-                  {t.archivedAt
-                    ? new Date(t.archivedAt).toLocaleString()
-                    : "—"}
-                </div>
-              ) : (
-                <div>
-                  <select
-                    className="w-full bg-white border border-slate-300 rounded px-2 py-2 text-sm text-slate-800"
-                    value={t.status}
-                    disabled={
-                      t.status === "COMPLETADA" || t.status === "OBJETADA"
-                    }
-                    onChange={(e) =>
-                      onChangeStatus(t.id, e.target.value as TaskStatus)
-                    }
-                  >
-                    <option value="PENDIENTE">Pendiente</option>
-                    <option value="EN_PROCESO">En proceso</option>
-                    <option value="COMPLETADA">Completada</option>
-                  </select>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
-              <button
-                onClick={() =>
-                  setExpanded((prev) => ({
-                    ...prev,
-                    [t.id]: !prev[t.id],
-                  }))
-                }
-                className="text-emerald-600 hover:underline"
-              >
-                {expanded[t.id] ? "Ocultar" : "Ver más..."}
-              </button>
-              {!showLog && (
-                <button
-                  onClick={() => onEdit(t)}
-                  className="text-sky-600 hover:underline"
-                >
-                  Editar
-                </button>
-              )}
-              {!showLog && t.status === "COMPLETADA" && (
-                <button
-                  onClick={() => onArchive(t.id)}
-                  className="text-emerald-700 hover:underline"
-                >
-                  Archivar
-                </button>
-              )}
-              <button
-                onClick={() => onDelete(t.id)}
-                className="text-rose-600 hover:underline"
-              >
-                {showLog ? "Eliminar (perm.)" : "Eliminar"}
-              </button>
-            </div>
-
-            {expanded[t.id] && (
-              <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-700 bg-white/60 rounded-xl p-3">
-                <div>
-                  <div className="text-[11px] text-slate-500">Teléfono</div>
-                  <div className="font-medium">{(t.customer as any)?.telefono ?? "—"}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-slate-500">Teléfono contacto</div>
-                  <div className="font-medium">{(t as any)?.telefonoContacto ?? "—"}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-slate-500">IP</div>
-                  <div className="font-medium">{(t.customer as any)?.ipAsignada ?? "—"}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-slate-500">Latitud</div>
-                  <div className="font-medium">{(t.customer as any)?.latitud ?? "—"}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-slate-500">Longitud</div>
-                  <div className="font-medium">{(t.customer as any)?.longitud ?? "—"}</div>
-                </div>
-              </div>
+                    {t.status === "COMPLETADA"
+                      ? t.comentarioFinal
+                        ? t.comentarioFinal.length > 80
+                          ? t.comentarioFinal.slice(0, 80) + "…"
+                          : t.comentarioFinal
+                        : "-"
+                      : t.motivoObjecion
+                      ? t.motivoObjecion.length > 80
+                        ? t.motivoObjecion.slice(0, 80) + "…"
+                        : t.motivoObjecion
+                      : "-"}
+                  </td>
+                  <td className="p-3">
+                    {showLog ? (
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() =>
+                            setExpanded((prev) => ({
+                              ...prev,
+                              [t.id]: !prev[t.id],
+                            }))
+                          }
+                          className="text-emerald-600 hover:underline text-xs"
+                        >
+                          {expanded[t.id] ? "Ocultar" : "Ver más..."}
+                        </button>
+                        <button
+                          onClick={() => onDelete(t.id)}
+                          className="text-rose-600 hover:underline text-xs"
+                        >
+                          Eliminar (permanente)
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() =>
+                            setExpanded((prev) => ({
+                              ...prev,
+                              [t.id]: !prev[t.id],
+                            }))
+                          }
+                          className="text-emerald-600 hover:underline text-xs"
+                        >
+                          {expanded[t.id] ? "Ocultar" : "Ver más..."}
+                        </button>
+                        <button
+                          onClick={() => onEdit(t)}
+                          className="text-sky-600 hover:underline text-xs"
+                        >
+                          Editar
+                        </button>
+                        {t.status === "COMPLETADA" && (
+                          <button
+                            onClick={() => onArchive(t.id)}
+                            className="text-emerald-700 hover:underline text-xs"
+                          >
+                            Archivar
+                          </button>
+                        )}
+                        <button
+                          onClick={() => onDelete(t.id)}
+                          className="text-rose-600 hover:underline text-xs"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </motion.tr>
+                {expanded[t.id] && (
+                  <tr className="border-t border-black/10 bg-slate-100/50">
+                    <td className="p-4 text-slate-700" colSpan={6}>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                        <div>
+                          <div className="text-[11px] text-slate-500">Teléfono</div>
+                          <div className="font-medium">{(t.customer as any)?.telefono ?? "—"}</div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] text-slate-500">Teléfono contacto</div>
+                          <div className="font-medium">{(t as any)?.telefonoContacto ?? "—"}</div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] text-slate-500">IP</div>
+                          <div className="font-medium">{(t.customer as any)?.ipAsignada ?? "—"}</div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] text-slate-500">Latitud</div>
+                          <div className="font-medium">{(t.customer as any)?.latitud ?? "—"}</div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] text-slate-500">Longitud</div>
+                          <div className="font-medium">{(t.customer as any)?.longitud ?? "—"}</div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </>
+            ))}
+            {tasks.length === 0 && (
+              <tr>
+                <td className="p-4 text-center text-slate-500" colSpan={6}>
+                  {showLog ? "Sin tareas archivadas." : "Sin tareas para mostrar."}
+                </td>
+              </tr>
             )}
-          </motion.div>
-        ))}
-        {tasks.length === 0 && (
-          <div className="text-center text-slate-500 text-sm py-8">
-            {showLog ? "Sin tareas archivadas." : "Sin tareas para mostrar."}
-          </div>
-        )}
-      </div>
+          </tbody>
+        </table>
+      </motion.div>
 
       {/* Drawer */}
       {open && (

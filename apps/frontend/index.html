@@ -1,1 +1,36 @@
-<!doctype html> <html lang="es"> <head> <meta charset="UTF-8" /> <meta name="viewport" content="width=device-width, initial-scale=1.0" /> <title>Internet Perla</title> <link rel="icon" type="image/svg+xml" href="/perla-logo.svg" /> <link rel="preconnect" href="https://fonts.googleapis.com"> <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet"> </head> <body class="bg-gray-50"> <div id="root"></div> <script type="module" src="/src/main.tsx"></script> </body> </html>
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Internet Perla</title>
+    <link rel="icon" type="image/svg+xml" href="/perla-logo.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="bg-gray-900">
+    <div id="root"></div>
+
+    <!-- Badge flotante de control de versiones -->
+    <footer
+      class="fixed bottom-3 left-0 right-0 z-50 flex justify-center pointer-events-none"
+    >
+      <div
+        class="pointer-events-auto inline-flex items-center gap-1 rounded-full bg-black/60 px-4 py-1.5 text-[10px] text-gray-200 border border-white/10 shadow-lg backdrop-blur-sm"
+      >
+        <span class="font-semibold tracking-wide uppercase">
+          Internet Perla
+        </span>
+        <span>·</span>
+        <span class="font-mono">V0.1.3</span>
+        <span>– Versión Beta</span>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
