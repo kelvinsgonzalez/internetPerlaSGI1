@@ -56,7 +56,6 @@ export default function TasksAdmin() {
   });
   const [telefonoContacto, setTelefonoContacto] = useState("");
   const [filterStatus, setFilterStatus] = useState<TaskStatus | "">("");
-  const [filterAssignedTo, setFilterAssignedTo] = useState("");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
 
   const { socket } = useSocket();
@@ -64,14 +63,7 @@ export default function TasksAdmin() {
   const load = async () => {
     const [u, t] = await Promise.all([
       api.get("/users"),
-      listTasks(
-        filterStatus || filterAssignedTo
-          ? {
-              ...(filterStatus ? { status: filterStatus } : {}),
-              ...(filterAssignedTo ? { assignedToId: filterAssignedTo } : {}),
-            }
-          : undefined
-      ),
+      listTasks(filterStatus ? { status: filterStatus } : undefined),
     ]);
     setUsers(u.data.value || u.data);
     setTasks(t as Task[]);
@@ -86,7 +78,7 @@ export default function TasksAdmin() {
 
   useEffect(() => {
     load(); // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterStatus, filterAssignedTo]);
+  }, [filterStatus]);
 
   useEffect(() => {
     if (!socket) return;
@@ -240,18 +232,6 @@ export default function TasksAdmin() {
                 Tareas (Admin)
             </motion.h1>
             <div className="flex gap-2">
-            <select
-                className="border rounded px-2 py-1"
-                value={filterAssignedTo}
-                onChange={(e) => setFilterAssignedTo(e.target.value)}
-            >
-                <option value="">Todos los asignados</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name || u.email}
-                  </option>
-                ))}
-            </select>
             <select
                 className="border rounded px-2 py-1"
                 value={filterStatus}
