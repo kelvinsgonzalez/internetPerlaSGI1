@@ -94,14 +94,6 @@ export class TasksController {
     return this.service.archiveTask(id);
   }
 
-  @Delete("archived")
-  @Roles("ADMIN")
-  clearArchived(@Query("before") before?: string) {
-    const beforeDate =
-      before && !Number.isNaN(Date.parse(before)) ? new Date(before) : undefined;
-    return this.service.clearArchived(beforeDate);
-  }
-
   @Delete(":id")
   @Roles("ADMIN")
   remove(@Param("id") id: string) {

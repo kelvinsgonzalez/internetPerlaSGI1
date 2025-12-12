@@ -239,15 +239,6 @@ export class TasksService {
     return saved;
   }
 
-  async clearArchived(before?: Date) {
-    const qb = this.tasks.createQueryBuilder().delete().from(Task).where("archived = true");
-    if (before) qb.andWhere("archivedAt < :before", { before });
-    const res = await qb.execute();
-    this.rt.broadcastToAdmins("tasks:update", { archivedCleared: true });
-    this.rt.broadcastAll("tasks:update", { archivedCleared: true });
-    return { deleted: res.affected ?? 0 };
-  }
-
   async remove(id: string) {
     const found = await this.tasks.findOne({ where: { id } });
     if (!found) throw new NotFoundException("Tarea no encontrada");
