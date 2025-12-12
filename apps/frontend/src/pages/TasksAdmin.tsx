@@ -78,12 +78,16 @@ export default function TasksAdmin() {
     } = { archived: showLog };
     if (filterStatus) params.status = filterStatus;
     if (filterAssignedTo) params.assignedToId = filterAssignedTo;
-    const [u, t] = await Promise.all([
-      api.get("/users"),
-      listTasks(params),
-    ]);
-    setUsers(u.data.value || u.data);
-    setTasks(t as Task[]);
+    try {
+      const [u, t] = await Promise.all([api.get("/users"), listTasks(params)]);
+      const list: User[] = (u.data.value || u.data) as User[];
+      setUsers(list.filter((u) => u.role === "USER"));
+      setTasks(t as Task[]);
+    } catch {
+      toast.error("No se pudieron cargar las tareas o usuarios.");
+      setUsers([]);
+      setTasks([]);
+    }
   };
   // Load customers when drawer opens to ensure token is present and reduce load
   useEffect(() => {
@@ -290,7 +294,7 @@ export default function TasksAdmin() {
                 onChange={(e) => setFilterAssignedTo(e.target.value)}
             >
                 <option value="">Todos los asignados</option>
-                {users.map((u) => (
+                {workerUsers.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.name || u.email}
                   </option>
