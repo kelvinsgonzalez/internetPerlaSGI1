@@ -34,8 +34,6 @@ export interface Task {
   comentarioFinal?: string | null;
   completedAt?: string | null;
   proofUrl?: string | null;
-  archived: boolean;
-  archivedAt?: string | null;
 }
 
 export interface CreateTaskInput {
@@ -59,7 +57,6 @@ export const listTasks = (params?: {
   status?: TaskStatus;
   assignedToId?: string;
   customerId?: string;
-  archived?: boolean;
 }) => api.get<Task[]>("/tasks", { params }).then((r) => r.data);
 
 export const listMyTasks = (params?: {
@@ -72,9 +69,6 @@ export const createTask = (input: CreateTaskInput) =>
 
 export const updateTask = (id: string, input: UpdateTaskInput) =>
   api.patch<Task>(`/tasks/${id}`, input).then((r) => r.data);
-
-export const archiveTask = (id: string) =>
-  api.patch<Task>(`/tasks/${id}/archive`).then((r) => r.data);
 
 export const deleteTask = (id: string) =>
   api.delete(`/tasks/${id}`).then((r) => r.data);

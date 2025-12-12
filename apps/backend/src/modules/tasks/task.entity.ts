@@ -29,6 +29,4 @@ export class Task {
   @Column({ type: "text", nullable: true }) comentarioFinal?: string | null;
   @Column({ type: "timestamptz", nullable: true }) completedAt?: Date | null;
   @Column({ type: "text", nullable: true }) proofUrl?: string | null;
-  @Column({ type: "boolean", default: false }) archived: boolean;
-  @Column({ type: "timestamptz", nullable: true }) archivedAt?: Date | null;
 }

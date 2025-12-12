@@ -45,22 +45,13 @@ export class TasksController {
     @Req() req: any,
     @Query("status") status?: string,
     @Query("assignedToId") assignedToId?: string,
-    @Query("customerId") customerId?: string,
-    @Query("archived") archived?: string
+    @Query("customerId") customerId?: string
   ) {
     const role = req.user?.role as "ADMIN" | "USER";
     const uid = req.user?.userId as string;
-    const archivedFlag =
-      archived === undefined
-        ? undefined
-        : ["true", "1", "yes"].includes(`${archived}`.toLowerCase());
-    const filters = { status, assignedToId, customerId, archived: archivedFlag };
+    const filters = { status, assignedToId, customerId };
     if (role === "ADMIN") return this.service.listAll(filters);
-    return this.service.listForUser(uid, {
-      status,
-      customerId,
-      archived: archivedFlag,
-    });
+    return this.service.listForUser(uid, { status, customerId });
   }
 
   @Get("mine")
@@ -86,12 +77,6 @@ export class TasksController {
       { id: req.user.userId, role: req.user.role },
       dto
     );
-  }
-
-  @Patch(":id/archive")
-  @Roles("ADMIN")
-  archive(@Param("id") id: string) {
-    return this.service.archiveTask(id);
   }
 
   @Delete(":id")
