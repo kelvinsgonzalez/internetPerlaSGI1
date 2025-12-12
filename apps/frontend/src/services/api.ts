@@ -59,6 +59,27 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+/**
+ * Interceptor global de respuestas: ante un 401 limpia el token y redirige a login.
+ * Evita dejar la UI vacía cuando el token caduca o el secreto cambia.
+ */
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    const status = err?.response?.status;
+    if (status === 401 && typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("ip_token");
+        const isOnLogin = window.location.pathname === "/login";
+        if (!isOnLogin) window.location.href = "/login";
+      } catch {
+        // ignorar
+      }
+    }
+    return Promise.reject(err);
+  }
+);
+
 // =============================================================
 // UTILIDAD
 // =============================================================

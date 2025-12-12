@@ -7,7 +7,7 @@ Sistema de administración + app web para gestión de colaboradores, inventario,
 - Realtime: Socket.IO.
 
 Aplicación web (producción)
-- https://internetperla.netlify.app/login
+- https://iperla.netlify.app/login
 
 ## Estructura
 - `apps/backend` — API REST + WebSockets
@@ -97,6 +97,12 @@ Nota: estas cuentas existen en la base de datos de producción; si se cambian/bo
 - Build: `npm run build`
 - Publish: `apps/frontend/dist`
 - Variables: `VITE_API_URL` (apuntar al dominio del backend), `VITE_SOCKET_URL`, `VITE_MAPBOX_TOKEN`.
+
+### Checklist Netlify / Render / Neon
+- Netlify: `VITE_API_URL` debe incluir `/api/v1` (ej. `https://tu-backend.onrender.com/api/v1`), `VITE_SOCKET_URL` es el origen del backend (sin `/api/v1`); redeploy para que Vite tome las env.
+- Render: `JWT_SECRET` fijo (no rotar entre despliegues), `JWT_EXPIRES_IN` opcional, `DATABASE_URL` de Neon con `sslmode=require`; redeploy tras cambios.
+- Neon: validar conexión (`DATABASE_URL`) y que exista al menos un usuario ADMIN; cambiar `JWT_SECRET` invalida tokens, los usuarios deben volver a iniciar sesión.
+- Navegador: si se cambia `JWT_SECRET`, limpiar `localStorage` (`ip_token`) o volver a autenticarse.
 
 ## Notas de mantenimiento
 - Si no puedes eliminar usuarios por restricciones de FK, ajusta el esquema:
