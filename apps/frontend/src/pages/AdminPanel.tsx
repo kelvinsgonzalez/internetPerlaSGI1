@@ -4,9 +4,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Activity, ArrowUpRight, Boxes, CalendarRange, Layers, RefreshCw, ShieldAlert, Sparkles, TrendingUp, Users2 } from 'lucide-react';
 import api from '../services/api';
-import Attendance from './Attendance';
-import Inventory from './Inventory';
-import Finance from './Finance';
 
 type Att = { id: string; createdAt?: string };
 type Cust = { id: string };
@@ -24,6 +21,7 @@ const StatCard = ({
   hint,
   delta,
   loading,
+  to,
 }: {
   icon: ElementType;
   title: string;
@@ -31,29 +29,33 @@ const StatCard = ({
   hint: string;
   delta: string;
   loading: boolean;
-}) => (
-  <motion.div
-    whileHover={{ translateY: -6, rotateX: 2 }}
-    transition={{ type: 'spring', stiffness: 200, damping: 18 }}
-    className={`${glassCard} relative overflow-hidden rounded-3xl p-5 text-slate-900`}
-  >
-    <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-transparent to-sky-500/10" />
-    <div className="relative flex items-center justify-between">
-      <div>
-        <p className="text-xs uppercase tracking-[0.25em] text-emerald-700/80">{title}</p>
-        <p className="mt-3 text-3xl font-bold text-slate-900">{loading ? '···' : value}</p>
-        <p className="mt-2 text-xs text-slate-500">{hint}</p>
+  to?: string;
+}) => {
+  const card = (
+    <motion.div
+      whileHover={{ translateY: -6, rotateX: 2 }}
+      transition={{ type: 'spring', stiffness: 200, damping: 18 }}
+      className={`${glassCard} relative overflow-hidden rounded-3xl p-5 text-slate-900 ${to ? 'cursor-pointer' : ''}`}
+    >
+      <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-transparent to-sky-500/10" />
+      <div className="relative flex items-center justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.25em] text-emerald-700/80">{title}</p>
+          <p className="mt-3 text-3xl font-bold text-slate-900">{loading ? '···' : value}</p>
+          <p className="mt-2 text-xs text-slate-500">{hint}</p>
+        </div>
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/20 text-emerald-700">
+          <Icon className="h-6 w-6" />
+        </div>
       </div>
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/20 text-emerald-700">
-        <Icon className="h-6 w-6" />
+      <div className="mt-6 flex items-center gap-2 text-xs font-semibold text-emerald-600">
+        <TrendingUp className="h-3.5 w-3.5" />
+        {delta}
       </div>
-    </div>
-    <div className="mt-6 flex items-center gap-2 text-xs font-semibold text-emerald-600">
-      <TrendingUp className="h-3.5 w-3.5" />
-      {delta}
-    </div>
-  </motion.div>
-);
+    </motion.div>
+  );
+  return to ? <Link to={to} className="block">{card}</Link> : card;
+};
 
 const Sparkline = ({ data }: { data: number[] }) => {
   const max = Math.max(...data, 1);
@@ -235,6 +237,7 @@ export default function AdminPanel() {
             hint="Registros totales sincronizados"
             delta="Seguimiento impecable esta semana"
             loading={loading}
+            to="/attendance"
           />
           <StatCard
             icon={Users2}
@@ -243,6 +246,7 @@ export default function AdminPanel() {
             hint="Clientes gestionados en CRM"
             delta="Experiencia positiva con respuestas rápidas"
             loading={loading}
+            to="/admin/clientes"
           />
           <StatCard
             icon={Boxes}
@@ -251,6 +255,7 @@ export default function AdminPanel() {
             hint="Portafolio vigente en inventario"
             delta="Actualización continua garantizada"
             loading={loading}
+            to="/inventory"
           />
           <StatCard
             icon={ShieldAlert}
@@ -259,12 +264,14 @@ export default function AdminPanel() {
             hint="Productos en umbral crítico"
             delta={lowStock.length === 0 ? 'Todo bajo control' : 'Toma acción antes del quiebre'}
             loading={loading}
+            to="/inventory"
           />
         </div>
 
         <div className="grid gap-6 xl:grid-cols-5">
+          <Link to="/attendance" className="block xl:col-span-3">
           <motion.div
-            className={`${glassCard} rounded-3xl p-6 xl:col-span-3`}
+            className={`${glassCard} rounded-3xl p-6 cursor-pointer`}
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
@@ -296,9 +303,11 @@ export default function AdminPanel() {
               </div>
             </div>
           </motion.div>
+          </Link>
 
+          <Link to="/inventory" className="block xl:col-span-2">
           <motion.div
-            className={`${glassCard} flex flex-col justify-between rounded-3xl p-6 xl:col-span-2`}
+            className={`${glassCard} flex flex-col justify-between rounded-3xl p-6 cursor-pointer h-full`}
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
@@ -326,11 +335,13 @@ export default function AdminPanel() {
               </div>
             </div>
           </motion.div>
+          </Link>
         </div>
 
         <div className="grid gap-6 xl:grid-cols-5">
+          <Link to="/inventory" className="block xl:col-span-3">
           <motion.div
-            className={`${glassCard} rounded-3xl p-6 xl:col-span-3`}
+            className={`${glassCard} rounded-3xl p-6 cursor-pointer`}
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
@@ -362,6 +373,7 @@ export default function AdminPanel() {
               </AnimatePresence>
             </div>
           </motion.div>
+          </Link>
 
           <motion.div
             className={`${glassCard} rounded-3xl p-6 xl:col-span-2`}

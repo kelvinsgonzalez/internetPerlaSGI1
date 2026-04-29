@@ -88,6 +88,10 @@ export class CustomersService {
     return { deleted: true };
   }
 
+  async removeAll() {
+    return this.repo.removeAll();
+  }
+
   // Basic CSV parser for simple comma-separated files with header
   private parseCsv(buffer: Buffer): { headers: string[]; rows: string[][] } {
     const content = buffer.toString("utf8");
@@ -102,8 +106,16 @@ export class CustomersService {
     return { headers, rows };
   }
 
-  // Import customers from CSV; detects duplicates by name+address and logs conflicts
-  async importCsv(file: Express.Multer.File) {
+  // Import customers from CSV; detects duplicates by name+address and logs conflicts.
+  // mode='replace' wipes all existing customers (and dependent tasks) before importing.
+  async importCsv(
+    file: Express.Multer.File,
+    mode: "append" | "replace" = "append"
+  ) {
+    let wiped = { tasks: 0, customers: 0 };
+    if (mode === "replace") {
+      wiped = await this.repo.removeAll();
+    }
     const { headers, rows } = this.parseCsv(file.buffer);
     const idx = (name: string) => headers.indexOf(name);
     const ipIdx = (() => {
@@ -227,7 +239,7 @@ export class CustomersService {
       inserted++;
     }
 
-    return { inserted, conflicts };
+    return { inserted, conflicts, mode, wiped };
   }
 
   async listConflicts() {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import ClienteFormDrawer from "../../../components/clientes/ClienteFormDrawer";
@@ -12,6 +12,7 @@ import {
   listConflicts,
   listCustomers,
   listPlans,
+  removeAllCustomers,
   removeCustomer,
   updateCustomer,
 } from "../../../services/clientes";
@@ -28,6 +29,9 @@ export default function ClientesAdminPage() {
   const [openImport, setOpenImport] = useState(false);
   const [editing, setEditing] = useState<CustomerDto | null>(null);
   const [query, setQuery] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [importMode, setImportMode] = useState<"append" | "replace">("append");
+  const replaceInputRef = useRef<HTMLInputElement>(null);
 
   const total = rows.length;
   const filtered = useMemo(() => {
@@ -82,14 +86,72 @@ export default function ClientesAdminPage() {
   };
 
   const onImport = async (file: File) => {
-    const res = await importCustomersCsv(file);
+    const res = await importCustomersCsv(file, importMode);
+    const wipeMsg = res?.wiped
+      ? ` (se borraron ${res.wiped.customers} clientes y ${res.wiped.tasks} tareas previas)`
+      : "";
     toast.success(
       `Importación completada: ${res?.inserted ?? 0} insertados, ${
         res?.conflicts ?? 0
-      } conflictos`
+      } conflictos${wipeMsg}`
     );
     await load();
     return res;
+  };
+
+  const onDeleteAll = async () => {
+    if (rows.length === 0) {
+      toast.info("No hay clientes para borrar.");
+      return;
+    }
+    const first = confirm(
+      `¿Borrar TODOS los ${rows.length} clientes? Esto también eliminará las tareas asociadas.`
+    );
+    if (!first) return;
+    const second = prompt(
+      'Esta acción no se puede deshacer. Escribe "BORRAR" para confirmar:'
+    );
+    if (second !== "BORRAR") {
+      toast.info("Acción cancelada.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await removeAllCustomers();
+      toast.success(
+        `Se borraron ${res.customers} clientes y ${res.tasks} tareas asociadas.`
+      );
+      await load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "No se pudo borrar todo.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onReplaceFile = async (file: File) => {
+    const ok = confirm(
+      `Vas a REEMPLAZAR todos los clientes con el contenido del archivo "${file.name}". Esto borra todos los clientes existentes (y sus tareas) y luego carga el CSV. ¿Continuar?`
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const res = await importCustomersCsv(file, "replace");
+      const wipe = res?.wiped;
+      toast.success(
+        `Reemplazo completado: ${res?.inserted ?? 0} insertados, ${
+          res?.conflicts ?? 0
+        } conflictos. Borrados previos: ${wipe?.customers ?? 0} clientes, ${
+          wipe?.tasks ?? 0
+        } tareas.`
+      );
+      await load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "No se pudo reemplazar.");
+    } finally {
+      setBusy(false);
+      if (replaceInputRef.current) replaceInputRef.current.value = "";
+    }
   };
 
   return (
@@ -110,20 +172,50 @@ export default function ClientesAdminPage() {
                         Administra tus clientes, importa desde CSV y revisa conflictos.
                     </p>
                 </motion.div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2">
                 <motion.button
-                    className="rounded-xl bg-white/80 px-4 py-2 text-sm font-semibold text-slate-700 shadow-md hover:bg-white transition-all"
-                    onClick={() => setOpenImport(true)}
+                    className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-rose-500/30 hover:bg-rose-700 transition-all disabled:opacity-60"
+                    onClick={onDeleteAll}
+                    disabled={busy || loading}
                     whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                 >
-                    Importar CSV
+                    Borrar todo
                 </motion.button>
                 <motion.button
-                    className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30 hover:bg-emerald-600 transition-all"
+                    className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-amber-500/30 hover:bg-amber-600 transition-all disabled:opacity-60"
+                    onClick={() => replaceInputRef.current?.click()}
+                    disabled={busy || loading}
+                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                    title="Sube un CSV: borra todos los clientes anteriores y carga los nuevos"
+                >
+                    Reemplazar (CSV)
+                </motion.button>
+                <input
+                    ref={replaceInputRef}
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) onReplaceFile(f);
+                    }}
+                />
+                <motion.button
+                    className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 hover:bg-sky-600 transition-all disabled:opacity-60"
+                    onClick={() => { setImportMode("append"); setOpenImport(true); }}
+                    disabled={busy || loading}
+                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                    title="Sube un CSV: agrega los registros nuevos sin borrar los existentes"
+                >
+                    Agregar (CSV)
+                </motion.button>
+                <motion.button
+                    className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30 hover:bg-emerald-600 transition-all disabled:opacity-60"
                     onClick={() => {
                     setEditing(null);
                     setOpenDrawer(true);
                     }}
+                    disabled={busy || loading}
                     whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                 >
                     + Agregar Cliente

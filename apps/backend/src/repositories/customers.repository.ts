@@ -30,4 +30,22 @@ export class CustomersRepository {
   remove(entity: Customer) {
     return this.repo.remove(entity);
   }
+  async removeAll(): Promise<{ tasks: number; customers: number }> {
+    return this.repo.manager.transaction(async (m) => {
+      const tasksRes = await m
+        .createQueryBuilder()
+        .delete()
+        .from("task")
+        .execute();
+      const custRes = await m
+        .createQueryBuilder()
+        .delete()
+        .from(Customer)
+        .execute();
+      return {
+        tasks: tasksRes.affected ?? 0,
+        customers: custRes.affected ?? 0,
+      };
+    });
+  }
 }

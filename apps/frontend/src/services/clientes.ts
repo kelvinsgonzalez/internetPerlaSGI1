@@ -74,12 +74,28 @@ export async function removeCustomer(id: string): Promise<void> {
   await api.delete(`/customers/${id}`);
 }
 
+export async function removeAllCustomers(): Promise<{
+  tasks: number;
+  customers: number;
+}> {
+  const { data } = await api.delete("/customers/all");
+  return data;
+}
+
+export interface ImportCsvResult {
+  inserted: number;
+  conflicts: number;
+  mode?: "append" | "replace";
+  wiped?: { tasks: number; customers: number };
+}
+
 export async function importCustomersCsv(
-  file: File
-): Promise<{ inserted: number; conflicts: number }> {
+  file: File,
+  mode: "append" | "replace" = "append"
+): Promise<ImportCsvResult> {
   const fd = new FormData();
   fd.append("file", file);
-  const { data } = await api.post("/customers/import", fd, {
+  const { data } = await api.post(`/customers/import?mode=${mode}`, fd, {
     headers: { "Content-Type": "multipart/form-data" },
   });
   return data;

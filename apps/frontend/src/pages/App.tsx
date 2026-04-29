@@ -7,7 +7,7 @@ import Attendance from "./Attendance";
 import CashCut from "./CashCut";
 import Dashboard from "./Dashboard";
 import Finance from "./Finance";
-import Inventory from "./Inventory";
+import InventoryHome from "./InventoryHome";
 import LoginPage from "./LoginPage";
 import MessagesPage from "./Messages";
 import MyTasks from "./MyTasks";
@@ -87,7 +87,7 @@ export default function App() {
           element={
             <Protected role="ADMIN">
               <AdminShell>
-                <Inventory />
+                <InventoryHome />
               </AdminShell>
             </Protected>
           }

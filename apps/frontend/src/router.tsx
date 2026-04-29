@@ -11,7 +11,10 @@ import Attendance from "./pages/Attendance";
 import CashCut from "./pages/CashCut";
 import Dashboard from "./pages/Dashboard";
 import Finance from "./pages/Finance";
-import Inventory from "./pages/Inventory";
+import InventoryHome from "./pages/InventoryHome";
+import InventoryStatus from "./pages/InventoryStatus";
+import InventoryMovements from "./pages/InventoryMovements";
+import InventoryConfig from "./pages/InventoryConfig";
 import LoginPage from "./pages/LoginPage";
 import MessagesPage from "./pages/Messages";
 import MyTasks from "./pages/MyTasks";
@@ -90,18 +93,14 @@ function MessagesRoute() {
   );
 }
 
-function InventoryRoute() {
+function InventoryRoute({ children }: { children: JSX.Element }) {
   const { user } = useAuth();
   if (user?.role === "ADMIN")
-    return (
-      <AdminShell>
-        <Inventory />
-      </AdminShell>
-    );
+    return <AdminShell>{children}</AdminShell>;
   return (
     <>
       <Navbar />
-      <Inventory />
+      {children}
     </>
   );
 }
@@ -207,7 +206,39 @@ export const router = createBrowserRouter(
           path: "inventory",
           element: (
             <Protected>
-              <InventoryRoute />
+              <InventoryRoute>
+                <InventoryHome />
+              </InventoryRoute>
+            </Protected>
+          ),
+        },
+        {
+          path: "inventory/estatus",
+          element: (
+            <Protected>
+              <InventoryRoute>
+                <InventoryStatus />
+              </InventoryRoute>
+            </Protected>
+          ),
+        },
+        {
+          path: "inventory/movimientos",
+          element: (
+            <Protected>
+              <InventoryRoute>
+                <InventoryMovements />
+              </InventoryRoute>
+            </Protected>
+          ),
+        },
+        {
+          path: "inventory/config",
+          element: (
+            <Protected role="ADMIN">
+              <AdminShell>
+                <InventoryConfig />
+              </AdminShell>
             </Protected>
           ),
         },

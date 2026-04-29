@@ -7,6 +7,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -56,6 +57,12 @@ export class CustomersController {
     return this.service.update(id, dto);
   }
 
+  @Delete("all")
+  @Roles(Role.ADMIN)
+  removeAll() {
+    return this.service.removeAll();
+  }
+
   @Delete(":id")
   @Roles(Role.ADMIN)
   remove(@Param("id", new ParseUUIDPipe({ version: "4" })) id: string) {
@@ -65,7 +72,11 @@ export class CustomersController {
   @Post("import")
   @Roles(Role.ADMIN)
   @UseInterceptors(FileInterceptor("file"))
-  importCsv(@UploadedFile() file: Express.Multer.File) {
-    return this.service.importCsv(file);
+  importCsv(
+    @UploadedFile() file: Express.Multer.File,
+    @Query("mode") mode?: string
+  ) {
+    const importMode: "append" | "replace" = mode === "replace" ? "replace" : "append";
+    return this.service.importCsv(file, importMode);
   }
 }
