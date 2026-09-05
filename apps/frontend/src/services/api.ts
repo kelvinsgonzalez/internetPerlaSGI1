@@ -59,19 +59,66 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+/**
+ * Sin esto, un token inválido o caducado (por ejemplo, uno emitido por otro
+ * backend o con otro JWT_SECRET) deja la app en un estado "sesión iniciada"
+ * en el que TODAS las peticiones fallan con 401 en silencio: las pantallas se
+ * ven vacías y no se puede guardar nada. Al primer 401 se cierra la sesión.
+ */
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    const url: string = error?.config?.url || "";
+    // Un 401 en el propio login es "credenciales incorrectas", no sesión caducada.
+    const isAuthCall = url.includes("/auth/login") || url.includes("/auth/register");
+
+    if (status === 401 && !isAuthCall) {
+      try {
+        localStorage.removeItem("ip_token");
+        localStorage.removeItem("accessToken");
+      } catch {
+        /* almacenamiento no disponible */
+      }
+      setAuth(undefined);
+      if (window.location.pathname !== "/login") {
+        window.location.replace("/login");
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // =============================================================
 // UTILIDAD
 // =============================================================
 
 /**
- * Devuelve el origen base del API (útil para sockets o assets).
+ * Devuelve el origen base del API (útil para assets servidos en /uploads).
  */
 export function getApiOrigin() {
   try {
-    return new URL(baseURL).origin;
+    return new URL(baseURL, window.location.origin).origin;
   } catch {
     return `${window.location.protocol}//${window.location.hostname}:3000`;
   }
+}
+
+/**
+ * Origen para Socket.IO. Prioriza `VITE_SOCKET_URL` — que hasta ahora se
+ * documentaba y se inyectaba en el build pero no se leía en ningún sitio — y
+ * cae al origen del API cuando no está definida.
+ */
+export function getSocketOrigin() {
+  const socketUrl = (import.meta.env.VITE_SOCKET_URL as string) || undefined;
+  if (socketUrl) {
+    try {
+      return new URL(socketUrl, window.location.origin).origin;
+    } catch {
+      /* configuración inválida: usar el origen del API */
+    }
+  }
+  return getApiOrigin();
 }
 
 export default api;

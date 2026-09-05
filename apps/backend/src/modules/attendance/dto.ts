@@ -8,16 +8,14 @@ import {
 } from "class-validator";
 import { AttendanceType } from "../../common/enums";
 
+// La identidad (name / userId) sale siempre del JWT, nunca del body: si se
+// aceptara del cliente, cualquier usuario podría marcar asistencia por otro.
 export class CheckDto {
-  @IsString() name: string;
   @IsEnum(AttendanceType) tipo: AttendanceType;
   @IsOptional() @IsString() note?: string;
 }
 
 export class CreateAttendanceDto {
-  @IsString()
-  userId: string;
-
   @IsDateString()
   date: string; // YYYY-MM-DD
 

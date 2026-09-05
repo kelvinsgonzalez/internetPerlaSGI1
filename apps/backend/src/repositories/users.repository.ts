@@ -8,7 +8,22 @@ export class UsersRepository {
   constructor(@InjectRepository(User) private repo: Repository<User>) {}
   findAll() { return this.repo.find(); }
   findById(id: string) { return this.repo.findOne({ where: { id } }); }
-  findByEmail(email: string) { return this.repo.findOne({ where: { email } }); }
+
+  /** Única vía que carga el hash: `passwordHash` es `select: false`. */
+  findByEmail(email: string) {
+    return this.repo.findOne({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        role: true,
+        name: true,
+        isBlocked: true,
+      },
+    });
+  }
+
   save(user: Partial<User>) { return this.repo.save(user); }
   async remove(user: User) { return this.repo.remove(user); }
   count() { return this.repo.count(); }

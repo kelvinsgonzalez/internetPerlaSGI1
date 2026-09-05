@@ -19,8 +19,12 @@ export class AttendanceService {
   list() {
     return this.repo.list();
   }
-  async check(dto: CheckDto) {
-    const saved = await this.repo.save(dto as Partial<AttendanceRecord>);
+  async check(dto: CheckDto, name: string) {
+    const saved = await this.repo.save({
+      name,
+      tipo: dto.tipo,
+      note: dto.note,
+    } as Partial<AttendanceRecord>);
     this.rt.broadcastToAdmins("attendance:created", saved);
     return saved;
   }
@@ -40,12 +44,12 @@ export class AttendanceService {
     };
   }
 
-  async register(dto: CreateAttendanceDto) {
+  async register(dto: CreateAttendanceDto, userId: string) {
     // Evitar duplicados por usuario/fecha
-    const { userId, date } = dto;
+    const { date } = dto;
     const existing = await this.dailyRepo.findOne({ where: { userId, date } });
     if (existing) return existing;
-    const entity = this.dailyRepo.create(dto);
+    const entity = this.dailyRepo.create({ ...dto, userId });
     return this.dailyRepo.save(entity);
   }
 }

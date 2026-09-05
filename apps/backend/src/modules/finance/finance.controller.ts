@@ -34,7 +34,7 @@ import { FinanceService } from "./finance.service";
 export class FinanceController {
   constructor(private service: FinanceService) {}
 
-  @Get("periods") listPeriods() {
+  @Get("periods") @Roles("ADMIN") listPeriods() {
     return this.service.listPeriods();
   }
   @Post("periods") @Roles("ADMIN") createPeriod(@Body() dto: CreatePeriodDto) {
@@ -47,7 +47,7 @@ export class FinanceController {
     return this.service.updatePeriodStatus(id, dto);
   }
 
-  @Get("payroll-items") listPayrollItems() {
+  @Get("payroll-items") @Roles("ADMIN") listPayrollItems() {
     return this.service.listPayrollItems();
   }
   @Post("payroll-items") @Roles("ADMIN") addPayrollItem(
@@ -56,7 +56,7 @@ export class FinanceController {
     return this.service.addPayrollItem(dto);
   }
 
-  @Get("loans") listLoans() {
+  @Get("loans") @Roles("ADMIN") listLoans() {
     return this.service.listLoans();
   }
   @Post("loans") @Roles("ADMIN") createLoan(@Body() dto: CreateLoanDto) {
@@ -69,7 +69,7 @@ export class FinanceController {
     return this.service.updateLoanBalance(id, dto);
   }
 
-  @Get("debts") listDebts() {
+  @Get("debts") @Roles("ADMIN") listDebts() {
     return this.service.listDebts();
   }
   @Post("debts") @Roles("ADMIN") createDebt(@Body() dto: CreateDebtDto) {

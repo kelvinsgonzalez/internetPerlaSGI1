@@ -6,7 +6,14 @@
     "start": "node dist/main.js",
     "build": "tsc -p tsconfig.json",
     "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
-    "seed": "ts-node src/seed.ts"
+    "seed": "ts-node src/seed.ts",
+    "migration:run": "ts-node ./node_modules/typeorm/cli.js migration:run -d src/data-source.ts",
+    "migration:revert": "ts-node ./node_modules/typeorm/cli.js migration:revert -d src/data-source.ts",
+    "migration:show": "ts-node ./node_modules/typeorm/cli.js migration:show -d src/data-source.ts",
+    "seed:prod": "node dist/seed.js",
+    "migration:run:prod": "node ./node_modules/typeorm/cli.js migration:run -d dist/data-source.js",
+    "migration:revert:prod": "node ./node_modules/typeorm/cli.js migration:revert -d dist/data-source.js",
+    "migration:show:prod": "node ./node_modules/typeorm/cli.js migration:show -d dist/data-source.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -23,6 +30,7 @@
     "bcryptjs": "^2.4.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
+    "dotenv": "^16.4.7",
     "glob": "^7.2.3",
     "lodash.includes": "^4.3.0",
     "luxon": "^3.7.2",
@@ -34,7 +42,8 @@
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.1",
     "socket.io": "^4.7.5",
-    "typeorm": "^0.3.20"
+    "typeorm": "^0.3.20",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

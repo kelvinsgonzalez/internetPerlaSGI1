@@ -124,8 +124,9 @@ export default function Dashboard(){
       return;
     }
     try {
-      const name = (user?.name || user?.email) as string;
-      await api.post('/attendance/check', { name, tipo: 'OUT', note: 'manual-out-dashboard' });
+      // El backend toma la identidad del JWT; mandarla desde el cliente
+      // permitiría marcar la salida de otra persona.
+      await api.post('/attendance/check', { tipo: 'OUT', note: 'manual-out-dashboard' });
       toast.success('Salida registrada correctamente');
       loadData();
     } catch {

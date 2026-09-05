@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -14,6 +15,7 @@ import {
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { FileInterceptor } from "@nestjs/platform-express";
+import { MulterOptions } from "@nestjs/platform-express/multer/interfaces/multer-options.interface";
 import { diskStorage } from "multer";
 import { v4 as uuidv4 } from "uuid";
 import { Roles } from "../auth/roles.decorator";
@@ -21,13 +23,39 @@ import { RolesGuard } from "../auth/roles.guard";
 import { CreateTaskDto, UpdateTaskDto } from "./dto";
 import { TasksService } from "./tasks.service";
 
-const storage = diskStorage({
-  destination: (req, file, cb) => cb(null, process.cwd() + "/uploads"),
-  filename: (req, file, cb) => {
-    const ext = file.originalname.split(".").pop();
-    cb(null, `${uuidv4()}.${ext}`);
+// Sólo imágenes: /uploads se sirve como estático desde el mismo origen que el
+// API, así que aceptar html/svg permitiría ejecutar scripts en ese origen.
+const ALLOWED_PROOF_TYPES: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/heic": "heic",
+};
+
+const MAX_PROOF_BYTES = 10 * 1024 * 1024; // 10 MB
+
+const proofUpload: MulterOptions = {
+  storage: diskStorage({
+    destination: (req, file, cb) => cb(null, process.cwd() + "/uploads"),
+    // La extensión sale del mime validado, nunca del nombre que manda el cliente.
+    filename: (req, file, cb) =>
+      cb(null, `${uuidv4()}.${ALLOWED_PROOF_TYPES[file.mimetype]}`),
+  }),
+  limits: { fileSize: MAX_PROOF_BYTES, files: 1 },
+  fileFilter: (req, file, cb) => {
+    if (!ALLOWED_PROOF_TYPES[file.mimetype]) {
+      cb(
+        new BadRequestException(
+          `Formato no permitido (${file.mimetype}). Sube una imagen JPG, PNG, WEBP, GIF o HEIC.`
+        ),
+        false
+      );
+      return;
+    }
+    cb(null, true);
   },
-});
+};
 
 @UseGuards(AuthGuard("jwt"), RolesGuard)
 @Controller("tasks")
@@ -60,7 +88,7 @@ export class TasksController {
   }
 
   @Patch(":id/complete")
-  @UseInterceptors(FileInterceptor("proof", { storage }))
+  @UseInterceptors(FileInterceptor("proof", proofUpload))
   complete(
     @Param("id") id: string,
     @UploadedFile() file: Express.Multer.File,

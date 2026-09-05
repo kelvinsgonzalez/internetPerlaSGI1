@@ -7,6 +7,7 @@ import {
   Unique,
 } from "typeorm";
 
+import { decimalTransformer } from "../../common/decimal.transformer";
 @Entity()
 @Unique(["date", "userId"])
 export class PayrollAccrual {
@@ -14,7 +15,7 @@ export class PayrollAccrual {
   @Column({ type: "date" }) date: string; // YYYY-MM-DD
   @Index() @Column({ type: "uuid" }) userId: string;
   @Column({ nullable: true }) userName?: string;
-  @Column("decimal", { precision: 12, scale: 2 }) amount: number;
+  @Column("decimal", { precision: 12, scale: 2, transformer: decimalTransformer }) amount: number;
   @Column({ default: "Sueldo diario" }) description: string;
   @Index() @Column({ type: "uuid", nullable: true }) cashClosureId?: string; // CashDailySummary.id
   @CreateDateColumn() createdAt: Date;

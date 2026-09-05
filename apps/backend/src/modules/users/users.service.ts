@@ -51,10 +51,10 @@ export class UsersService {
   }
 
   async updateLocation(userId: string, latitude: number, longitude: number) {
-    console.log(`Received location update for user ${userId}: ${latitude}, ${longitude}`);
     const user = await this.findOne(userId);
     user.latitude = latitude;
     user.longitude = longitude;
+    user.locationUpdatedAt = new Date();
     await this.repo.save(user);
     this.realtimeGateway.handleLocationUpdate(userId, latitude, longitude);
     return { success: true };

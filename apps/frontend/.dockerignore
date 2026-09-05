@@ -1,0 +1,15 @@
+# Dependencias y build: se reinstalan/recompilan dentro de la imagen
+node_modules
+dist
+*.tsbuildinfo
+
+# Secretos: las VITE_* llegan por build args, no por archivo
+.env
+.env.*
+!.env.example
+
+# Varios
+.git
+.gitignore
+.DS_Store
+npm-debug.log*

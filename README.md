@@ -15,10 +15,16 @@ Aplicación web (producción)
 - `docker-compose.yml` — orquesta DB + backend + frontend
 
 ## Requisitos
-- Node.js 18+ (recomendado 20)
+- Node.js 20+ (recomendado 22 LTS, que es la versión de las imágenes Docker)
 - Docker (opcional para levantar todo con compose)
 
 ## Arranque rápido con Docker
+
+> Postgres pasó de la 15 a la **17** (la misma versión que usaba Neon, para que
+> los dumps se restauren sin conversiones). Si vienes de un volumen creado con
+> la 15, Postgres no arrancará sobre él: respáldalo y recréalo con
+> `docker compose down && docker volume rm <proyecto>_ip_db_data`.
+
 1) (Opcional) Copia `apps/backend/.env.example` a `apps/backend/.env` y ajusta valores si lo necesitas.
 2) Ejecuta: `docker compose up --build`
 3) URLs:
@@ -74,19 +80,59 @@ Notas:
 - `GET /api/v1/health` → `{ status: 'ok' }`
 - `POST /api/v1/auth/login`, `POST /api/v1/auth/register`
 
-## Credenciales de ejemplo (seed)
+## Credenciales de ejemplo (seed local)
 - `admin@example.com` / `123456` (ADMIN)
 - `user@example.com` / `123456` (USER)
 
-Usuarios de demostración (producción)
-“Si desea ingresar como administrador, conéctese a la base de datos y cambie manualmente el rol del usuario.”
-- Sadie González — `sadie@gmail.com` / `sadie123`
-- Yair Villatoro — `yair@gmail.com` / `yair123`
-- Kelvin Sadie — `kelvin@gmail.com` / `kelvin123`
-- Josué Morales — `josue@gmail.com` / `josue123`
-Nota: estas cuentas existen en la base de datos de producción; si se cambian/borran, las credenciales pueden dejar de funcionar.
+Sólo para la base de datos local que crea `npm run seed`. **Nunca** documentes aquí
+credenciales de cuentas reales de producción: este archivo se versiona.
 
-## Despliegue sugerido
+Para promover a un usuario a ADMIN en producción, cambia su `role` directamente en
+la base de datos o hazlo desde el panel con una cuenta ADMIN existente.
+
+## Migraciones
+
+Las migraciones viven en `apps/backend/src/migrations` y están registradas en el
+DataSource. No se ejecutan solas salvo que definas `DB_MIGRATIONS_RUN=true`.
+
+- `npm run migration:show` — estado
+- `npm run migration:run` — aplicar pendientes
+- `npm run migration:revert` — deshacer la última
+
+En producción usa `DB_SYNC=false` y aplica los cambios con `migration:run`.
+
+## Despliegue en producción (VPS)
+
+La vía soportada es un VPS con Docker Compose + Traefik + Let's Encrypt,
+probada sobre **Contabo con Ubuntu 24.04 LTS**. La guía paso a paso está en
+[DEPLOY_VPS.md](DEPLOY_VPS.md).
+
+Resumen:
+
+```bash
+# 1) En el VPS, como root: instala Docker, ufw, fail2ban, swap y el usuario 'deploy'
+sudo bash scripts/vps-bootstrap.sh deploy
+
+# 2) Como 'deploy', configura los secretos
+cp .env.prod.example .env && nano .env && chmod 600 .env
+
+# 3) Despliega (build + up + espera a healthy)
+bash scripts/deploy.sh
+
+# 4) Sólo la primera vez: crea el administrador
+docker compose -f docker-compose.prod.yml exec backend npm run seed:prod
+```
+
+Operación:
+
+| Tarea | Comando |
+|---|---|
+| Actualizar | `bash scripts/deploy.sh` |
+| Backup (base + uploads) | `bash scripts/backup-db.sh` |
+| Restaurar | `bash scripts/restore-db.sh <archivo.sql.gz>` |
+| Migraciones a mano | `docker compose -f docker-compose.prod.yml exec backend npm run migration:run:prod` |
+
+## Despliegue histórico (Render + Netlify)
 
 ### Backend (Render + Neon)
 - Definir `DATABASE_URL`, `DB_SSL=true`, `DB_SYNC=false` (o habilitar `true` temporalmente para sincronizar y volver a `false`).

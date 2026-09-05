@@ -17,6 +17,17 @@ interface Worker {
   latitude: number;
   longitude: number;
   isOnline: boolean;
+  locationUpdatedAt: string | null;
+}
+
+// Se considera activo a quien reportó ubicación en los últimos 15 minutos.
+const ONLINE_WINDOW_MS = 15 * 60 * 1000;
+
+function isRecent(locationUpdatedAt?: string | null) {
+  if (!locationUpdatedAt) return false;
+  const reportedAt = new Date(locationUpdatedAt).getTime();
+  if (Number.isNaN(reportedAt)) return false;
+  return Date.now() - reportedAt <= ONLINE_WINDOW_MS;
 }
 
 export function WorkersMap() {
@@ -30,12 +41,14 @@ export function WorkersMap() {
   useEffect(() => {
     api.get('/users/with-location').then((res) => {
       const workersWithStatus: Worker[] = res.data.map(
-        (w: any, index: number): Worker => ({
+        (w: any): Worker => ({
           id: w.id,
           name: w.name,
-          latitude: w.latitude,
-          longitude: w.longitude,
-          isOnline: index % 2 === 0,
+          latitude: Number(w.latitude),
+          longitude: Number(w.longitude),
+          locationUpdatedAt: w.locationUpdatedAt ?? null,
+          // Antes era `index % 2 === 0`: un placeholder que se leía como dato real.
+          isOnline: isRecent(w.locationUpdatedAt),
         })
       );
       setWorkers(workersWithStatus);
@@ -52,14 +65,14 @@ export function WorkersMap() {
   }, []);
 
   const handleWorkerClick = (worker: Worker) => {
-    if (worker.isOnline) {
-      setSelectedWorker(worker);
-      mapRef.current?.flyTo({
-        center: [worker.longitude, worker.latitude],
-        zoom: 15,
-        duration: 2000,
-      });
-    }
+    // Todo colaborador con coordenadas es seleccionable; `isOnline` sólo indica
+    // si la señal es reciente, no si su última posición sirve de algo.
+    setSelectedWorker(worker);
+    mapRef.current?.flyTo({
+      center: [worker.longitude, worker.latitude],
+      zoom: 15,
+      duration: 2000,
+    });
   };
 
   const toggleMapStyle = () => {
@@ -137,21 +150,22 @@ export function WorkersMap() {
                   <li
                     key={worker.id}
                     onClick={() => handleWorkerClick(worker)}
-                    className={`flex items-center justify-between rounded-full px-4 py-2.5 transition-all duration-300 ${
-                      selectedWorker?.id === worker.id && worker.isOnline
+                    title={
+                      worker.isOnline
+                        ? 'Señal reciente (últimos 15 min)'
+                        : worker.locationUpdatedAt
+                        ? `Última señal: ${new Date(worker.locationUpdatedAt).toLocaleString()}`
+                        : 'Sin fecha de último reporte'
+                    }
+                    className={`flex cursor-pointer items-center justify-between rounded-full px-4 py-2.5 transition-all duration-300 ${
+                      selectedWorker?.id === worker.id
                         ? 'bg-emerald-100/90 shadow-inner'
-                        : worker.isOnline
-                        ? 'bg-white/80 hover:bg-emerald-50/70'
-                        : 'bg-slate-50/60'
-                    } ${
-                      worker.isOnline ? 'cursor-pointer' : 'cursor-not-allowed'
+                        : 'bg-white/80 hover:bg-emerald-50/70'
                     }`}
                   >
                     <p
                       className={`font-semibold text-sm ${
-                        worker.isOnline
-                          ? 'text-slate-800'
-                          : 'text-slate-500 line-through'
+                        worker.isOnline ? 'text-slate-800' : 'text-slate-500'
                       }`}
                     >
                       {worker.name}
@@ -192,7 +206,6 @@ export function WorkersMap() {
             >
               <NavigationControl position="top-left" />
               {workers
-                .filter((w: Worker) => w.isOnline)
                 .map((worker: Worker) => (
                   <div key={`marker-container-${worker.id}`}>
                     <Marker

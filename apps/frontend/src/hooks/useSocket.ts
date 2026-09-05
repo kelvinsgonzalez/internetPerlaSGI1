@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import { getApiOrigin } from "../services/api";
+import { getSocketOrigin } from "../services/api";
 import { useAuth } from "./useAuth";
 
 export function useSocket() {
@@ -14,7 +14,7 @@ export function useSocket() {
       sockRef.current = null;
       return;
     }
-    const s = io(getApiOrigin(), {
+    const s = io(getSocketOrigin(), {
       transports: ["websocket"],
       auth: { token },
     });

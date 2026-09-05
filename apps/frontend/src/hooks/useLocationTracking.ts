@@ -1,60 +1,57 @@
 import { useEffect, useRef } from 'react';
-import { useAuth } from './useAuth'; // O la ruta a tu hook de auth
+import api from '../services/api';
+import { useAuth } from './useAuth';
 
+/**
+ * Reporta la ubicación del colaborador mientras tiene sesión abierta.
+ * Los ADMIN no se rastrean.
+ */
 export const useLocationTracking = () => {
-  const { token, user } = useAuth(); // Asumiendo que useAuth provee el token y el usuario
+  const { token, user } = useAuth();
   const watchId = useRef<number | null>(null);
 
+  const isTrackable = Boolean(token) && user?.role === 'USER';
+
   useEffect(() => {
-    if (!token || user?.role === 'ADMIN') {
-      // Si no hay token o el usuario es admin, no hacer nada
+    if (!isTrackable) return;
+
+    if (!('geolocation' in navigator)) {
+      console.error('Geolocation is not supported by this browser.');
       return;
     }
 
     const sendLocation = (position: GeolocationPosition) => {
-      console.log('Sending location to backend...');
       const { latitude, longitude } = position.coords;
-      
-      fetch(`${import.meta.env.VITE_API_URL}/users/update-location`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          latitude: latitude,
-          longitude: longitude
-        })
-      })
-      .then(res => console.log('Location sent successfully:', res))
-      .catch(err => console.error('Error sending location:', err));
+      // Usa el cliente axios: así respeta VITE_API_URL o VITE_API_BASE_URL y
+      // adjunta el token igual que el resto de la app.
+      api
+        .patch('/users/update-location', { latitude, longitude })
+        .catch((err) => console.error('Error sending location:', err));
     };
 
     const handleError = (error: GeolocationPositionError) => {
       console.error('Error getting location:', error.message);
     };
 
-    if ('geolocation' in navigator) {
-      // Inicia el rastreo
-      watchId.current = navigator.geolocation.watchPosition(
-        sendLocation, 
-        handleError, 
-        {
-          enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 0 
-        }
-      );
-    } else {
-      console.error('Geolocation is not supported by this browser.');
-    }
+    watchId.current = navigator.geolocation.watchPosition(
+      sendLocation,
+      handleError,
+      {
+        // Alta precisión con maximumAge 0 mantenía el GPS encendido de forma
+        // permanente; esto sigue siendo suficiente para ubicar a un técnico.
+        enableHighAccuracy: false,
+        timeout: 15000,
+        maximumAge: 60000,
+      },
+    );
 
-    // Limpieza: deja de rastrear cuando el componente se desmonte
     return () => {
       if (watchId.current !== null) {
         navigator.geolocation.clearWatch(watchId.current);
+        watchId.current = null;
       }
     };
-
-  }, [token]); // El efecto se re-ejecuta si el token cambia
+    // `user.role` decide si se rastrea, así que tiene que estar en las deps:
+    // antes sólo estaba `token` y el efecto se quedaba con el rol anterior.
+  }, [isTrackable]);
 };

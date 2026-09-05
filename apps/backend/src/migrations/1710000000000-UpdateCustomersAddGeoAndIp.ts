@@ -14,10 +14,10 @@ export class UpdateCustomersAddGeoAndIp1710000000000
       `ALTER TABLE "customer" ADD COLUMN IF NOT EXISTS "ip_asignada" character varying(50)`
     );
     await queryRunner.query(
-      `ALTER TABLE "customer" ADD COLUMN IF NOT EXISTS "latitud" numeric(10,6)`
+      `ALTER TABLE "customer" ADD COLUMN IF NOT EXISTS "latitud" character varying`
     );
     await queryRunner.query(
-      `ALTER TABLE "customer" ADD COLUMN IF NOT EXISTS "longitud" numeric(10,6)`
+      `ALTER TABLE "customer" ADD COLUMN IF NOT EXISTS "longitud" character varying`
     );
   }
 

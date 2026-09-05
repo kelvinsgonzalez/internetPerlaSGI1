@@ -17,6 +17,9 @@ coverage/
 .env.local
 .env.*
 apps/**/.env
+# ...pero las plantillas sin secretos si se versionan
+!.env.prod.example
+!**/.env.example
 
 # Editor/OS
 .DS_Store
@@ -24,6 +27,12 @@ Thumbs.db
 .idea/
 .vscode/
 
-# Docker local artifacts
-**/.dockerignore
+# Nota: los .dockerignore SI se versionan. Sin ellos, `COPY . .` mete
+# node_modules, dist y los .env locales dentro de la imagen.
 
+
+# Build info de TypeScript
+*.tsbuildinfo
+
+# Archivos subidos en runtime
+apps/backend/uploads/

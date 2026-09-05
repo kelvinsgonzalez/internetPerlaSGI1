@@ -8,19 +8,17 @@ import {
   WebSocketServer,
 } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
+import { isOriginAllowed } from "../common/cors";
 
 type JwtPayload = { sub: string; role?: "ADMIN" | "USER"; email?: string };
-
-// 👇 MISMO LISTADO QUE EN main.ts
-const allowedOrigins = [
-  "http://localhost:5173",
-  "https://iperla.netlify.app",
-];
 
 @Injectable()
 @WebSocketGateway({
   cors: {
-    origin: allowedOrigins,
+    // Se resuelve por conexión (no al importar el módulo) para que respete
+    // CORS_ORIGINS igual que el CORS HTTP de main.ts.
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) =>
+      callback(null, isOriginAllowed(origin)),
     credentials: true,
   },
 })

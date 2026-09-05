@@ -1,236 +1,235 @@
 # Despliegue en VPS — InternetPerla
 
-Guía completa para migrar el proyecto desde Render/Netlify/Neon a un único VPS usando Docker Compose + Traefik + Let's Encrypt.
+Guía concreta para poner el sistema en producción en un **VPS de Contabo con
+Ubuntu 24.04 LTS**, usando Docker Compose + Traefik + Let's Encrypt.
+
+Sirve igual para cualquier otro proveedor (Hetzner, DigitalOcean, Lightsail):
+lo único específico de Contabo son las notas marcadas como *Contabo*.
 
 ---
 
-## 1. Información que necesito de ti
+## 1. Lo que necesitas antes de empezar
 
-Antes de poder cerrar la migración, debes proporcionar / decidir lo siguiente. **Cada elemento marcado con `[PENDIENTE]` debe quedar resuelto antes del primer despliegue.**
+| Requisito | Detalle |
+|---|---|
+| VPS | Contabo con **Ubuntu 24.04 LTS**. Mínimo 2 vCPU / 4 GB RAM / 40 GB. El plan "VPS 1" cumple de sobra. |
+| Acceso | La IP y la contraseña de root que Contabo envía por correo tras el aprovisionamiento. |
+| Dominio | Uno propio, con acceso al panel DNS. Se usan dos subdominios: uno para la app y otro para el API. |
+| Correo | Para los avisos de Let's Encrypt. |
+| Token de Mapbox | Público (`pk.*`), sólo si quieres el mapa de colaboradores. |
 
-### 1.1 Servidor (VPS)
-- `[PENDIENTE]` Proveedor del VPS (DigitalOcean, Hetzner, Contabo, AWS Lightsail, etc.).
-- `[PENDIENTE]` IP pública del VPS.
-- `[PENDIENTE]` Usuario SSH con privilegios sudo (recomendado: NO usar root directo).
-- `[PENDIENTE]` Sistema operativo (recomendado: Ubuntu 22.04 LTS o 24.04 LTS).
-- `[PENDIENTE]` Recursos mínimos sugeridos: 2 vCPU, 4 GB RAM, 40 GB SSD.
+Decisiones ya tomadas en esta configuración:
 
-### 1.2 Dominio y DNS
-- `[PENDIENTE]` Dominio principal (ej. `internetperla.com`).
-- `[PENDIENTE]` Subdominio para frontend (ej. `app.internetperla.com` o el dominio raíz).
-- `[PENDIENTE]` Subdominio para backend / API (ej. `api.internetperla.com`).
-- `[PENDIENTE]` Acceso al panel DNS del proveedor (Cloudflare, Namecheap, etc.) para crear los registros `A` apuntando a la IP del VPS.
-
-### 1.3 Base de datos
-- ¿Se migra la base de datos actual de Neon al VPS o se mantiene Neon?
-  - Opción A (recomendada): Postgres en Docker dentro del VPS (incluida en `docker-compose.prod.yml`).
-  - Opción B: Seguir usando Neon (solo se necesita el `DATABASE_URL` y `DB_SSL=true`).
-- `[PENDIENTE]` Si se migra: necesito el dump actual de Neon (`pg_dump`) para restaurarlo.
-- `[PENDIENTE]` Credenciales para el Postgres del VPS:
-  - `DB_USERNAME`
-  - `DB_PASSWORD` (mínimo 24 caracteres aleatorios)
-  - `DB_DATABASE`
-
-### 1.4 Secretos y variables
-- `[PENDIENTE]` `JWT_SECRET` nuevo (mínimo 32 caracteres aleatorios). **No reutilizar el actual** porque está en `.env.local`.
-- `[PENDIENTE]` `BUSINESS_TZ` (actualmente `America/Guatemala`, confirmar).
-- `[PENDIENTE]` `AUTO_CLOSE_ENABLED` (`true` o `false`).
-- `[PENDIENTE]` `VITE_MAPBOX_TOKEN` para el mapa de colaboradores. Conviene generar uno nuevo y revocar el actual (está commiteado en `apps/frontend/.env.local`).
-- `[PENDIENTE]` Email para notificaciones de Let's Encrypt (`ACME_EMAIL`). Recibe avisos si un certificado falla renovación.
-
-### 1.5 Backups
-- `[PENDIENTE]` ¿Dónde se guardarán los backups? (mismo VPS, S3, Backblaze B2, rsync a otra máquina).
-- `[PENDIENTE]` Frecuencia y retención (sugerido: diario, retención 14 días).
-
-### 1.6 Otros
-- `[PENDIENTE]` ¿Quién más tendrá acceso SSH al VPS? (lista de claves públicas).
-- `[PENDIENTE]` ¿Se quiere monitoreo / alertas? (Uptime Kuma, Better Stack, etc.).
+- **Postgres corre dentro del VPS**, en el propio compose. Si prefieres seguir
+  con Neon, ver [§7](#7-alternativa-seguir-usando-neon).
+- **Migraciones TypeORM**, no `synchronize`. El esquema se versiona.
+- **Traefik** termina TLS y renueva certificados solo.
 
 ---
 
-## 2. Cambios en código necesarios
+## 2. Preparar el servidor
 
-> Estado de cada cambio: [HECHO] ya está aplicado en este repo, [PENDIENTE] hay que aplicarlo.
+### 2.1 Entrar y asegurar el acceso
 
-### 2.1 Frontend
-- [HECHO] Nuevo `apps/frontend/Dockerfile` que compila con Vite y sirve con Nginx.
-- [HECHO] `apps/frontend/nginx.conf` con fallback SPA (`try_files`) y caché de estáticos.
-- [HECHO] Las variables `VITE_*` se inyectan en build time vía `ARG` del Dockerfile (ya están parametrizadas en `docker-compose.prod.yml`).
+*Contabo* entrega el VPS con acceso `root` por contraseña. Lo primero es
+cambiar eso por una clave SSH.
 
-### 2.2 Backend
-- [PENDIENTE] **CORS por variable de entorno.** Actualmente [apps/backend/src/main.ts:8-11](apps/backend/src/main.ts#L8-L11) tiene los orígenes hardcodeados. Hay que cambiarlo a leer `CORS_ORIGINS` (lista separada por comas). Te lo puedo aplicar cuando quieras.
-- [PENDIENTE] **Migraciones TypeORM en lugar de `synchronize`.** En producción `DB_SYNC=false`. Ya existen 2 migraciones en `apps/backend/src/migrations/` pero el `app.module.ts` no las ejecuta automáticamente. Hay que añadir `migrationsRun: true` y un script `npm run migration:run`.
-- [PENDIENTE] **Quitar el parche `jsonwebtoken`** del [apps/backend/Dockerfile:10-11](apps/backend/Dockerfile#L10-L11) si actualizamos `jsonwebtoken` y/o `@nestjs/jwt` a una versión que no necesite el parche. Se puede dejar tal cual si funciona, pero conviene investigar.
-- [PENDIENTE] (Opcional) Healthcheck más completo en `/health` que valide conexión a DB.
+Desde **tu máquina**:
 
-### 2.3 Repositorio
-- [PENDIENTE] Asegurar que `.env.local` y cualquier archivo con secretos NO esté en el historial de Git. Si fue commiteado en algún momento, **rotar todas las credenciales** y considerar `git filter-repo` para limpiar.
-- [PENDIENTE] Añadir `.env` (sin `.local`) a `.gitignore` por si acaso (ya está cubierto por `.env*`).
+```bash
+ssh-keygen -t ed25519 -C "internetperla-vps"     # si aún no tienes clave
+ssh-copy-id root@IP_DEL_VPS
+ssh root@IP_DEL_VPS                               # ya no debe pedir contraseña
+```
+
+Ya dentro del VPS, desactiva el acceso por contraseña:
+
+```bash
+sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+# Contabo deja overrides que pueden reactivar la contraseña; revísalos:
+grep -rE 'PasswordAuthentication|PermitRootLogin' /etc/ssh/sshd_config.d/ 2>/dev/null
+systemctl restart ssh
+```
+
+> Antes de cerrar esta sesión, abre **otra terminal** y comprueba que puedes
+> entrar. Si algo salió mal, la sesión actual sigue abierta para arreglarlo.
+
+### 2.2 Bootstrap automático
+
+El repositorio trae un script que deja el servidor listo:
+
+```bash
+apt-get update && apt-get install -y git
+git clone <URL_DE_TU_REPO> /opt/internetperla
+cd /opt/internetperla
+sudo bash scripts/vps-bootstrap.sh deploy
+```
+
+Instala y configura Docker + Compose, `ufw` (SSH/80/443), `fail2ban`,
+actualizaciones de seguridad automáticas, la zona horaria
+`America/Guatemala`, 2 GB de swap y un usuario `deploy` con acceso a Docker.
+
+> *Contabo* entrega los VPS **sin swap**. El build del frontend (Vite +
+> Mapbox) consume bastante memoria y en planes de 4 GB puede fallar sin ella;
+> por eso el script la crea.
+
+> **ufw y Docker:** Docker escribe sus propias reglas en iptables y se salta
+> `ufw` en los puertos que publica. Aquí sólo Traefik publica el 80 y el 443,
+> que de todos modos deben estar abiertos, y Postgres no publica ninguno.
+> No añadas `ports:` al servicio `db`.
+
+Después, continúa como el usuario `deploy`:
+
+```bash
+sudo chown -R deploy:deploy /opt/internetperla
+su - deploy
+cd /opt/internetperla
+```
 
 ---
 
-## 3. Archivos nuevos en este repositorio
+## 3. DNS
 
-- [DEPLOY_VPS.md](DEPLOY_VPS.md) — este documento.
-- [docker-compose.prod.yml](docker-compose.prod.yml) — orquestación de producción con Traefik + Postgres + backend + frontend.
-- [apps/frontend/Dockerfile](apps/frontend/Dockerfile) — multistage build con Nginx (reemplaza el anterior).
-- [apps/frontend/nginx.conf](apps/frontend/nginx.conf) — config de Nginx para SPA.
+En tu proveedor de DNS, crea dos registros **A** apuntando a la IPv4 del VPS:
+
+| Tipo | Nombre | Valor | TTL |
+|---|---|---|---|
+| A | `app` | IP_DEL_VPS | 300 |
+| A | `api` | IP_DEL_VPS | 300 |
+
+Verifica antes de seguir:
+
+```bash
+dig +short app.tudominio.com
+dig +short api.tudominio.com
+```
+
+Ambos deben devolver la IP del VPS. **Si no propagaron, Let's Encrypt fallará**
+y Traefik quedará reintentando.
+
+> No crees registros `AAAA` salvo que hayas configurado IPv6 en el VPS. Si el
+> dominio resuelve a una IPv6 en la que nada escucha, la validación del
+> certificado falla.
 
 ---
 
-## 4. Procedimiento de despliegue paso a paso
-
-### 4.1 Preparar el VPS
+## 4. Configurar y desplegar
 
 ```bash
-# Conectarse
-ssh usuario@IP_DEL_VPS
-
-# Actualizar sistema
-sudo apt update && sudo apt upgrade -y
-
-# Instalar Docker + Compose plugin
-curl -fsSL https://get.docker.com | sudo sh
-sudo usermod -aG docker $USER
-# (cerrar sesión y volver a entrar para que tome el grupo)
-
-# Firewall básico
-sudo ufw allow OpenSSH
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw enable
-
-# (Opcional pero recomendado) fail2ban
-sudo apt install -y fail2ban
+cp .env.prod.example .env
+nano .env
+chmod 600 .env
 ```
 
-### 4.2 Configurar DNS
-
-En tu proveedor de DNS, crear registros `A`:
-
-| Tipo | Nombre | Valor          | TTL  |
-|------|--------|----------------|------|
-| A    | app    | IP_DEL_VPS     | 300  |
-| A    | api    | IP_DEL_VPS     | 300  |
-
-Esperar a que propaguen (`dig app.tu-dominio.com +short` debe devolver la IP).
-
-### 4.3 Clonar repo y configurar `.env`
+Rellena los dominios, el correo de ACME y genera los secretos:
 
 ```bash
-# En el VPS
-git clone https://github.com/TU_USUARIO/internetperla.git
-cd internetperla
-
-# Crear el archivo de entorno de producción
-cp .env.prod.example .env.prod   # (crearemos esta plantilla en el siguiente paso)
-nano .env.prod
+openssl rand -base64 32   # -> DB_PASSWORD
+openssl rand -hex 32      # -> JWT_SECRET
 ```
 
-Contenido de `.env.prod` (rellenar con los valores acordados en la sección 1):
+> **No reutilices** el `JWT_SECRET` ni la contraseña de base de datos que
+> estuvieron commiteados en `apps/backend/.env.local`: deben considerarse
+> comprometidos.
 
-```dotenv
-# Dominios
-FRONTEND_DOMAIN=app.tu-dominio.com
-BACKEND_DOMAIN=api.tu-dominio.com
-ACME_EMAIL=tu-email@ejemplo.com
-
-# Base de datos
-DB_USERNAME=internetperla
-DB_PASSWORD=CONTRASEÑA_FUERTE_AQUÍ
-DB_DATABASE=internetperla
-DB_SYNC=false
-
-# JWT
-JWT_SECRET=GENERA_UNA_CADENA_LARGA_ALEATORIA
-JWT_EXPIRES_IN=7d
-
-# Negocio
-BUSINESS_TZ=America/Guatemala
-AUTO_CLOSE_ENABLED=false
-
-# Mapbox (frontend)
-VITE_MAPBOX_TOKEN=pk.tu_token_de_mapbox
-```
-
-### 4.4 Primer despliegue
+Despliega:
 
 ```bash
-# Levantar todo (descarga imágenes, construye, arranca)
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
-
-# Ver logs
-docker compose -f docker-compose.prod.yml logs -f
+bash scripts/deploy.sh
 ```
 
-Traefik obtendrá el certificado de Let's Encrypt automáticamente la primera vez que se acceda a cada dominio por HTTPS.
+El script valida el `.env`, respalda la base si ya existía, construye las
+imágenes, levanta todo y espera a que el backend quede `healthy`.
 
-### 4.5 Inicializar la base de datos
-
-**Opción A — primera vez (sin datos previos):** activar temporalmente `DB_SYNC=true` en `.env.prod`, levantar, ejecutar el seed, y volver a `false`:
+### 4.1 Crear el primer administrador
 
 ```bash
-docker compose -f docker-compose.prod.yml exec backend npm run seed
+docker compose -f docker-compose.prod.yml exec backend npm run seed:prod
 ```
 
-Luego `DB_SYNC=false` y `docker compose -f docker-compose.prod.yml up -d backend`.
+Crea `admin@example.com` / `123456`. **Entra y cambia esa contraseña de
+inmediato**, o borra el usuario tras crear el tuyo desde el panel.
 
-**Opción B — restaurar desde Neon:**
+### 4.2 Verificación
 
 ```bash
-# Subir el dump al VPS
-scp dump.sql usuario@IP:/tmp/
-
-# Restaurar
-docker compose -f docker-compose.prod.yml exec -T db \
-  psql -U $DB_USERNAME -d $DB_DATABASE < /tmp/dump.sql
+curl https://api.tudominio.com/api/v1/health     # -> {"status":"ok"}
+curl -I https://app.tudominio.com                # -> HTTP/2 200
 ```
 
-### 4.6 Verificación
-
-- `https://api.tu-dominio.com/api/v1/health` debe responder `{ "status": "ok" }`.
-- `https://app.tu-dominio.com` debe cargar el login.
-- Login + WebSocket: abrir DevTools → Network → comprobar que la conexión WS a `wss://api.tu-dominio.com/socket.io/` se establece.
+Y en el navegador: abre la app, inicia sesión, y en DevTools → Network
+comprueba que la conexión a `wss://api.tudominio.com/socket.io/` se establece.
 
 ---
 
 ## 5. Operación
 
-### 5.1 Actualizaciones
+### 5.1 Actualizar a la última versión
 
 ```bash
-cd ~/internetperla
-git pull
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+cd /opt/internetperla
+bash scripts/deploy.sh
 ```
 
-### 5.2 Backups de Postgres
+Hace `git pull`, reconstruye y reinicia. Toma un backup automático antes de
+tocar la base, y aborta si ese backup falla.
 
-Crear `/etc/cron.daily/internetperla-backup`:
+### 5.2 Migraciones
+
+Con `DB_MIGRATIONS_RUN=true` (el valor por defecto en `.env.prod.example`) se
+aplican solas al arrancar el backend. Para hacerlo a mano:
 
 ```bash
-#!/bin/bash
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP_DIR=/var/backups/internetperla
-mkdir -p $BACKUP_DIR
-docker compose -f /home/usuario/internetperla/docker-compose.prod.yml exec -T db \
-  pg_dump -U internetperla internetperla | gzip > $BACKUP_DIR/db_$TIMESTAMP.sql.gz
-find $BACKUP_DIR -name "db_*.sql.gz" -mtime +14 -delete
+docker compose -f docker-compose.prod.yml exec backend npm run migration:show:prod
+docker compose -f docker-compose.prod.yml exec backend npm run migration:run:prod
 ```
 
+> Dentro del contenedor de producción **no existe `ts-node`** (se instala con
+> `--omit=dev`). Usa siempre las variantes `:prod`, que corren sobre `dist/`.
+
+### 5.3 Backups
+
+Manual:
+
 ```bash
-sudo chmod +x /etc/cron.daily/internetperla-backup
+bash scripts/backup-db.sh
 ```
 
-### 5.3 Logs
+Respalda la base y el volumen de archivos subidos en `~/backups/internetperla`,
+con 14 días de retención, y verifica que el dump no salga vacío ni corrupto.
+
+Diario a las 03:00, como usuario `deploy`:
 
 ```bash
+crontab -e
+```
+
+```cron
+0 3 * * * cd /opt/internetperla && bash scripts/backup-db.sh >> /home/deploy/backup.log 2>&1
+```
+
+> Un backup que sólo vive en el mismo VPS no te salva de perder el VPS.
+> Copia `~/backups/` fuera del servidor periódicamente (`rsync`, S3, Backblaze).
+
+Restaurar:
+
+```bash
+bash scripts/restore-db.sh ~/backups/internetperla/internetperla-20260903-030000.sql.gz
+```
+
+### 5.4 Logs y estado
+
+```bash
+docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs -f backend
-docker compose -f docker-compose.prod.yml logs -f frontend
 docker compose -f docker-compose.prod.yml logs -f traefik
 ```
 
-### 5.4 Reinicio de servicios
+Los logs están limitados a 10 MB × 5 archivos por contenedor, así que no
+llenan el disco.
+
+### 5.5 Reiniciar un servicio
 
 ```bash
 docker compose -f docker-compose.prod.yml restart backend
@@ -241,21 +240,94 @@ docker compose -f docker-compose.prod.yml restart backend
 ## 6. Troubleshooting
 
 | Síntoma | Causa probable | Solución |
-|--------|----------------|----------|
-| Certificado SSL no se emite | DNS no propagado o puerto 80 cerrado | Verificar `dig`, abrir 80/tcp en firewall del VPS y del proveedor |
-| Frontend carga pero API falla con CORS | `CORS_ORIGINS` no incluye el dominio | Editar `main.ts` (sección 2.2) o añadir el dominio al array |
-| WebSocket no conecta | Proxy bloqueando upgrade | Traefik soporta WS por defecto; revisar que `VITE_SOCKET_URL` use `https://` |
-| `DB connection refused` al primer arranque | Backend levanta antes que DB | El compose ya tiene `depends_on: condition: service_healthy`, esperar |
-| Imagen muy grande | Cache de Docker | `docker system prune -af` |
+|---|---|---|
+| El certificado no se emite | DNS sin propagar, puerto 80 cerrado, o un registro `AAAA` sin IPv6 funcional | `dig +short app.tudominio.com`, `ufw status`, borrar el `AAAA` |
+| `too many certificates already issued` | Límite semanal de Let's Encrypt por repetir despliegues fallidos | Esperar, y probar primero con `--certificatesresolvers.le.acme.caserver` de staging |
+| El frontend carga pero el API da error de CORS | `FRONTEND_DOMAIN` en `.env` no coincide con el dominio real | Corregir `.env` y `docker compose ... up -d backend` |
+| El WebSocket no conecta | `VITE_SOCKET_URL` apunta a `http://` en vez de `https://` | Lo genera el compose desde `BACKEND_DOMAIN`; reconstruir el frontend |
+| Cambié una `VITE_*` y no se aplica | Se hornean en el bundle durante el build, no en runtime | `docker compose -f docker-compose.prod.yml build frontend && ... up -d frontend` |
+| `DB connection refused` al arrancar | El backend arrancó antes que Postgres | Ya hay `depends_on: service_healthy`; revisar `logs db` |
+| El build del frontend muere sin mensaje | Sin memoria (VPS de 4 GB sin swap) | `swapon --show`; si está vacío, correr `vps-bootstrap.sh` otra vez |
+| `permission denied` al usar docker | El usuario acaba de entrar al grupo `docker` | Cerrar sesión y volver a entrar |
+| Disco lleno | Imágenes viejas acumuladas | `docker system prune -af` |
 
 ---
 
-## 7. Roadmap de hardening (post-despliegue)
+## 7. Alternativa: seguir usando Neon
 
-1. Migraciones TypeORM en lugar de `synchronize`.
-2. CORS desde variable de entorno.
-3. Rate limiting en el backend (`@nestjs/throttler`).
-4. Logs centralizados (Loki + Grafana, o un servicio externo).
-5. Monitoreo de uptime (Uptime Kuma corriendo en el mismo VPS).
-6. Renovación automática de claves SSH y rotación de `JWT_SECRET`.
-7. Considerar Cloudflare delante para DDoS / cache.
+Si prefieres no alojar Postgres en el VPS:
+
+1. En `.env`, añade `DATABASE_URL=postgresql://...` y `DB_SSL=true`.
+2. Comenta el servicio `db` y su `depends_on` en `docker-compose.prod.yml`.
+
+`AppModule` da prioridad a `DATABASE_URL` sobre las variables `DB_*`, así que
+no hace falta tocar código.
+
+**Para migrar de Neon al VPS**, en cambio:
+
+```bash
+# En tu máquina, con la DATABASE_URL de Neon
+pg_dump "postgresql://..." --clean --if-exists | gzip > neon.sql.gz
+scp neon.sql.gz deploy@IP_DEL_VPS:/opt/internetperla/
+# En el VPS
+bash scripts/restore-db.sh /opt/internetperla/neon.sql.gz
+```
+
+---
+
+## 8. Qué corre en el VPS y qué no
+
+Todo el sistema vive en el propio servidor. Nada de la aplicación depende de un
+servicio gestionado por terceros:
+
+| Componente | Dónde corre | Estado externo |
+|---|---|---|
+| Base de datos | Contenedor `db` (postgres:17-alpine), volumen `ip_db_data` en el VPS | Ninguno |
+| Backend | Contenedor `backend`, imagen construida en el VPS | Ninguno: no hace **ninguna** llamada saliente |
+| Frontend | Contenedor `frontend` (nginx), bundle compilado en el VPS | Ninguno para cargar la app |
+| Archivos subidos | Volumen `uploads` en el VPS | Ninguno |
+| TLS | Traefik en el VPS | Let's Encrypt sólo al emitir/renovar el certificado |
+
+Lo único que el **navegador** pide fuera del VPS es **Mapbox**
+(`api.mapbox.com` para los mapas, `events.mapbox.com` para su telemetría), y
+sólo al abrir la página *Mapa de ubicación*. Es inherente a usar Mapbox: no se
+puede quitar sin renunciar al mapa o montar un servidor de teselas propio. El
+resto de la app funciona con normalidad aunque Mapbox sea inalcanzable.
+
+La tipografía Montserrat **está autoalojada** (`@fontsource/montserrat`): antes
+se pedía a `fonts.googleapis.com` y `fonts.gstatic.com` en cada carga, y ya no.
+
+Docker Hub y npm sólo intervienen **al construir**, no en tiempo de ejecución.
+
+Para comprobarlo tú mismo tras un despliegue, abre DevTools → Network, filtra
+por dominio y confirma que sólo aparecen tus dos subdominios (y `api.mapbox.com`
+si entras al mapa).
+
+---
+
+## 9. Estado del hardening
+
+Ya aplicado en el repositorio:
+
+- [x] CORS por variable de entorno (`CORS_ORIGINS`), compartido entre el API y Socket.IO.
+- [x] Migraciones TypeORM con `DB_SYNC=false` en producción.
+- [x] `.dockerignore` en ambas apps: `node_modules`, `dist` y los `.env` locales ya no entran a la imagen.
+- [x] Healthchecks de Postgres y del backend; el despliegue falla si el backend no levanta.
+- [x] Límites de log por contenedor.
+- [x] Cabeceras de seguridad (HSTS, nosniff, referrer-policy) vía middleware de Traefik.
+- [x] Postgres sin puertos publicados, sólo en la red interna del compose.
+- [x] La subida de archivos acepta sólo imágenes, con límite de 10 MB.
+- [x] Scripts de backup verificado y restauración.
+
+Pendiente, en orden de valor:
+
+1. **Rotar las credenciales comprometidas** — la contraseña de Neon, el `JWT_SECRET`
+   y el token de Mapbox estuvieron en `apps/backend/.env.local`, versionado desde el
+   commit inicial. Sacarlo del índice no lo borra del historial: hace falta rotar, y
+   opcionalmente limpiar con `git filter-repo`.
+2. Copiar los backups fuera del VPS.
+3. Rate limiting en el backend (`@nestjs/throttler`) o vía middleware de Traefik.
+4. Monitoreo de uptime (Uptime Kuma cabe en el mismo VPS).
+5. Actualizar dependencias con vulnerabilidades que exigen saltos mayores
+   (NestJS 12, Vite 8, react-router 7).
+6. Cloudflare por delante para DDoS y caché.

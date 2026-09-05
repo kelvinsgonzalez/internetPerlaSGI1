@@ -34,6 +34,11 @@ import { RepositoriesModule } from "./repositories/repositories.module";
           type: 'postgres' as const,
           autoLoadEntities: true,
           synchronize: cfg.get('DB_SYNC') === 'true',
+          // Las migraciones quedan registradas; se ejecutan al arrancar sólo si
+          // DB_MIGRATIONS_RUN=true, y si no, con `npm run migration:run`.
+          migrations: [join(__dirname, 'migrations', '*{.ts,.js}')],
+          migrationsTableName: 'migrations',
+          migrationsRun: cfg.get('DB_MIGRATIONS_RUN') === 'true',
           ssl,
         };
 

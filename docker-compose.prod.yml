@@ -1,7 +1,19 @@
+# Despliegue de producción en un VPS (probado contra Contabo + Ubuntu 24.04).
+# Variables en el archivo .env de esta misma carpeta (ver .env.prod.example).
+# Uso: docker compose -f docker-compose.prod.yml up -d --build
+
+# Sin límite de logs, journald/json-file llena el disco del VPS en semanas.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   traefik:
     image: traefik:v3.1
     restart: unless-stopped
+    logging: *default-logging
     command:
       - --providers.docker=true
       - --providers.docker.exposedByDefault=false
@@ -16,24 +28,38 @@ services:
       - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
       - --log.level=INFO
       - --accesslog=true
+    environment:
+      TZ: ${BUSINESS_TZ:-America/Guatemala}
     ports:
       - "80:80"
       - "443:443"
     volumes:
+      # Sólo lectura: Traefik únicamente necesita descubrir contenedores.
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - traefik_letsencrypt:/letsencrypt
     networks:
       - web
+    labels:
+      # Cabeceras de seguridad aplicadas a frontend y backend.
+      - traefik.enable=true
+      - traefik.http.middlewares.sec-headers.headers.stsSeconds=31536000
+      - traefik.http.middlewares.sec-headers.headers.stsIncludeSubdomains=true
+      - traefik.http.middlewares.sec-headers.headers.contentTypeNosniff=true
+      - traefik.http.middlewares.sec-headers.headers.browserXssFilter=true
+      - traefik.http.middlewares.sec-headers.headers.referrerPolicy=strict-origin-when-cross-origin
 
   db:
-    image: postgres:15-alpine
+    image: postgres:17-alpine
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_DATABASE}
+      TZ: ${BUSINESS_TZ:-America/Guatemala}
     volumes:
       - ip_db_data:/var/lib/postgresql/data
+    # Sin `ports`: la base sólo es visible dentro de la red interna.
     networks:
       - internal
     healthcheck:
@@ -47,16 +73,22 @@ services:
     build:
       context: ./apps/backend
     restart: unless-stopped
+    logging: *default-logging
     environment:
       PORT: 3000
       NODE_ENV: production
+      TZ: ${BUSINESS_TZ:-America/Guatemala}
       DB_HOST: db
       DB_PORT: 5432
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_DATABASE: ${DB_DATABASE}
+      # Postgres corre en la red interna del compose: TLS no aporta aquí.
       DB_SSL: "false"
       DB_SYNC: ${DB_SYNC:-false}
+      # Migraciones al arrancar. Alternativa: dejarlo en false y ejecutar
+      # `npm run migration:run:prod` manualmente dentro del contenedor.
+      DB_MIGRATIONS_RUN: ${DB_MIGRATIONS_RUN:-true}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       BUSINESS_TZ: ${BUSINESS_TZ:-America/Guatemala}
@@ -70,6 +102,16 @@ services:
     networks:
       - internal
       - web
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('http').get('http://127.0.0.1:3000/api/v1/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     labels:
       - traefik.enable=true
       - traefik.docker.network=web
@@ -77,16 +119,22 @@ services:
       - traefik.http.routers.backend.entrypoints=websecure
       - traefik.http.routers.backend.tls=true
       - traefik.http.routers.backend.tls.certresolver=le
+      - traefik.http.routers.backend.middlewares=sec-headers@docker
       - traefik.http.services.backend.loadbalancer.server.port=3000
 
   frontend:
     build:
       context: ./apps/frontend
       args:
+        # Las VITE_* se hornean en el bundle durante el build, no en runtime:
+        # cambiarlas exige reconstruir la imagen del frontend.
         VITE_API_URL: https://${BACKEND_DOMAIN}/api/v1
         VITE_SOCKET_URL: https://${BACKEND_DOMAIN}
         VITE_MAPBOX_TOKEN: ${VITE_MAPBOX_TOKEN}
     restart: unless-stopped
+    logging: *default-logging
+    environment:
+      TZ: ${BUSINESS_TZ:-America/Guatemala}
     depends_on:
       - backend
     networks:
@@ -98,6 +146,7 @@ services:
       - traefik.http.routers.frontend.entrypoints=websecure
       - traefik.http.routers.frontend.tls=true
       - traefik.http.routers.frontend.tls.certresolver=le
+      - traefik.http.routers.frontend.middlewares=sec-headers@docker
       - traefik.http.services.frontend.loadbalancer.server.port=80
 
 networks:

@@ -112,8 +112,8 @@ export default function MyTasks() {
       const totalTasks = tasks.length;
       if (!user?.sub) return;
 
+      // userId lo resuelve el backend desde el JWT.
       await api.post("/attendance", {
-        userId: user.sub,
         date: today,
         completedTasks,
         totalTasks,

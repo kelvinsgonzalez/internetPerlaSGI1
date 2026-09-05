@@ -1,4 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { InventoryItemsRepository } from '../../repositories/inventory-items.repository';
 import { WarehousesRepository } from '../../repositories/warehouses.repository';
 import { InventoryStocksRepository } from '../../repositories/inventory-stocks.repository';
@@ -16,6 +18,7 @@ export class InventoryService {
     private warehouses: WarehousesRepository,
     private stocks: InventoryStocksRepository,
     private movements: InventoryMovementsRepository,
+    @InjectDataSource() private dataSource: DataSource,
   ) {}
 
   // ========== ITEMS ==========
@@ -105,64 +108,73 @@ export class InventoryService {
   }
 
   // ========== STOCKS & MOVEMENTS ==========
-  private async getOrCreateStock(
-    itemId: string,
-    warehouseId: string,
-  ): Promise<InventoryStock> {
-    let stock = await this.stocks.findByItemAndWarehouse(itemId, warehouseId);
-    if (!stock) {
-      const item = await this.items.findById(itemId);
-      const warehouse = await this.warehouses.findById(warehouseId);
-      if (!item || !warehouse)
-        throw new NotFoundException('Item o almacén no encontrado.');
-      stock = await this.stocks.save({ item, warehouse, quantity: 0 } as any);
-    }
-    return stock;
-  }
-
   async move(dto: MovementDto): Promise<InventoryMovement> {
-    // Validar item
-    const item = await this.getItemById(dto.itemId);
-
-    // Validar warehouse
     if (!dto.warehouseId) {
       throw new BadRequestException('warehouseId es obligatorio.');
     }
-    const warehouse = await this.warehouses.findById(dto.warehouseId);
-    if (!warehouse) {
-      throw new NotFoundException('Almacén no encontrado.');
+    if (!Number.isInteger(dto.quantity) || dto.quantity <= 0) {
+      throw new BadRequestException('La cantidad debe ser un entero mayor a 0.');
     }
-
-    // Validar cantidad
-    if (dto.quantity <= 0) {
-      throw new BadRequestException('La cantidad debe ser mayor a 0.');
-    }
-
-    // Obtener o crear stock
-    const stock = await this.getOrCreateStock(dto.itemId, dto.warehouseId);
-
-    // Procesar movimiento
-    if (dto.type === 'IN') {
-      stock.quantity += dto.quantity;
-    } else if (dto.type === 'OUT') {
-      if (stock.quantity < dto.quantity) {
-        throw new BadRequestException(
-          `Stock insuficiente. Disponible: ${stock.quantity}, Solicitado: ${dto.quantity}`,
-        );
-      }
-      stock.quantity -= dto.quantity;
-    } else {
+    if (dto.type !== 'IN' && dto.type !== 'OUT') {
       throw new BadRequestException(`Tipo de movimiento inválido: ${dto.type}`);
     }
+    const warehouseId = dto.warehouseId;
 
-    await this.stocks.save(stock);
+    // Todo dentro de una transacción con bloqueo de la fila de stock: dos OUT
+    // simultáneos sobre el mismo item ya no pueden dejar la existencia negativa.
+    return this.dataSource.transaction(async (manager) => {
+      const item = await manager.findOne(InventoryItem, {
+        where: { id: dto.itemId },
+      });
+      if (!item)
+        throw new NotFoundException(`Item con ID "${dto.itemId}" no encontrado.`);
 
-    return this.movements.save({
-      item,
-      type: dto.type,
-      quantity: dto.quantity,
-      note: dto.note || 'Movimiento registrado',
-    } as any);
+      const warehouse = await manager.findOne(Warehouse, {
+        where: { id: warehouseId },
+      });
+      if (!warehouse) throw new NotFoundException('Almacén no encontrado.');
+
+      // QueryBuilder en vez de findOne: las relaciones eager generan LEFT JOIN
+      // y Postgres rechaza FOR UPDATE sobre el lado nullable de un outer join.
+      let stock = await manager
+        .createQueryBuilder(InventoryStock, 's')
+        .setLock('pessimistic_write')
+        .where('s."itemId" = :itemId AND s."warehouseId" = :warehouseId', {
+          itemId: item.id,
+          warehouseId: warehouse.id,
+        })
+        .getOne();
+
+      if (!stock) {
+        stock = await manager.save(
+          InventoryStock,
+          manager.create(InventoryStock, { item, warehouse, quantity: 0 }),
+        );
+      }
+
+      if (dto.type === 'IN') {
+        stock.quantity += dto.quantity;
+      } else {
+        if (stock.quantity < dto.quantity) {
+          throw new BadRequestException(
+            `Stock insuficiente. Disponible: ${stock.quantity}, Solicitado: ${dto.quantity}`,
+          );
+        }
+        stock.quantity -= dto.quantity;
+      }
+      await manager.save(InventoryStock, stock);
+
+      return manager.save(
+        InventoryMovement,
+        manager.create(InventoryMovement, {
+          item,
+          warehouse,
+          type: dto.type,
+          quantity: dto.quantity,
+          note: dto.note || 'Movimiento registrado',
+        }),
+      );
+    });
   }
 
   async listStocks(): Promise<InventoryStock[]> {

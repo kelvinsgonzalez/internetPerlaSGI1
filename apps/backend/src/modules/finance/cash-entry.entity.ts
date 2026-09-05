@@ -5,6 +5,7 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 
+import { decimalTransformer } from "../../common/decimal.transformer";
 export type CashEntryType = "INCOME" | "EXPENSE";
 
 @Entity()
@@ -18,7 +19,7 @@ export class CashEntry {
 
   @Column("text") description: string;
 
-  @Column("decimal", { precision: 12, scale: 2 }) amount: number;
+  @Column("decimal", { precision: 12, scale: 2, transformer: decimalTransformer }) amount: number;
 
   @CreateDateColumn() createdAt: Date;
 

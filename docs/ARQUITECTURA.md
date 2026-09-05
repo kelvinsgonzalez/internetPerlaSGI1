@@ -13,16 +13,16 @@ Este documento resume la arquitectura, módulos, modelos de datos, endpoints y f
 ## Backend (NestJS)
 
 - Entrypoint: `src/main.ts`
-  - CORS habilitado, `app.setGlobalPrefix('api/v1')`, ValidationPipe global.
+  - CORS por `CORS_ORIGINS` (helper compartido en `src/common/cors.ts`, usado también por el gateway de Socket.IO), `app.setGlobalPrefix('api/v1')`, ValidationPipe global.
 - `AppModule`: carga `ConfigModule`, `ServeStaticModule` para `/uploads`, y `TypeOrmModule.forRootAsync` con `synchronize` configurable por `DB_SYNC`.
 - Módulos principales:
   - `auth`: login/register, JWT strategy. Login auto-registra asistencia IN para usuarios normales si no existe en el día.
   - `users`: entidad `User { id, email, passwordHash, role, name }`.
   - `customers`: CRUD simple `Customer { id, name, email, phone? }`.
-  - `attendance`: `AttendanceRecord { id, name, tipo(IN|OUT), timestamp, note? }`.
+  - `attendance`: `AttendanceRecord { id, name, tipo(IN|OUT), timestamp, note? }`. El nombre lo pone el servidor desde el JWT, nunca el cliente.
   - `inventory`: Items, Warehouses, Stocks y Movements (IN/OUT) vía repos dedicados.
   - `finance`: Periodos de planilla, ítems, préstamos y deudas internas.
-  - `messages` y `tasks`: módulos listados para UI.
+  - `messages` y `tasks`: módulos listados para UI. La subida de "prueba" de tarea acepta sólo imágenes (máx. 10 MB) y renombra el archivo según el mime validado.
   - `realtime`: gateway WebSocket que valida JWT y segmenta por rooms.
 - Capa de Repositorios (`src/repositories`): Injectable wrappers de `Repository<T>` para aislamiento y testing; autoLoadEntities=true.
 
@@ -82,7 +82,7 @@ Corte de caja (disponible para ADMIN y USER):
 
 - Prefijo de rutas en backend `/api/v1`; en frontend se usa `api.get('/...')` sin volver a anteponer el prefijo.
 - Validación con class-validator en DTOs; pipes con `whitelist` y `transform` activos.
-- Entities usan `decimal` para montos; considerar convertir a number en el cliente.
+- Las columnas `decimal` usan `decimalTransformer` (`src/common/decimal.transformer.ts`), así que el API entrega `number` y no `string`.
 - Roles: ADMIN controla módulos sensibles (inventario, finanzas, usuarios). USER usa dashboard y mensajería.
 
 ## Flujo de Autenticación y Realtime
@@ -91,10 +91,16 @@ Corte de caja (disponible para ADMIN y USER):
 2. Frontend guarda `ip_token` y configura Axios; hook `useSocket` abre conexión WS con `auth.token`.
 3. Gateway verifica JWT y asocia socket a rooms por usuario y por rol.
 
+## Migraciones
+
+- Viven en `src/migrations`, registradas en `AppModule` y en `src/data-source.ts` (para la CLI).
+- No corren solas: `DB_MIGRATIONS_RUN=true` o `npm run migration:run`.
+
 ## Próximos pasos sugeridos
 
-- Tests unitarios para servicios y repositorios.
-- Manejo estricto de decimales (usar string en API o librería decimal.js) para evitar redondeos.
+- Tests unitarios para servicios y repositorios (el proyecto no tiene ninguno todavía).
+- Unificar los tres modelos de asistencia (`AttendanceRecord`, `Attendance` y los cierres de caja por usuario).
+- Unificar el nombrado español/inglés de `Customer` (la entidad usa inglés y el API traduce en cada respuesta).
+- Implementar `POST /attendance/manual-entry`, que el frontend ya llama y no existe.
 - Agregar paginación/búsqueda en listados de clientes e inventario.
 - Emisiones realtime en eventos clave (nuevo cliente, movimiento de inventario, etc.).
-- Hardening: `DB_SYNC=false` en producción y migraciones TypeORM.

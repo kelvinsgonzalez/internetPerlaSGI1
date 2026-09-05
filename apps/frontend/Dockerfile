@@ -1,9 +1,9 @@
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci || npm install
 
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /app
 ARG VITE_API_URL
 ARG VITE_SOCKET_URL

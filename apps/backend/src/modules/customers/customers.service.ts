@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { CustomerConflictsRepository } from "../../repositories/customer-conflicts.repository";
 import { CustomersRepository } from "../../repositories/customers.repository";
 import { PlansRepository } from "../../repositories/plans.repository";
@@ -52,8 +56,6 @@ export class CustomersService {
   }
 
   async update(id: string, dto: UpdateCustomerDto) {
-    const c = await this.findOne(id);
-    // c is currently Spanish DTO because of findOne mapping; reload entity
     const entity = await this.repo.findById(id);
     if (!entity) throw new NotFoundException("Not found");
     Object.assign(entity, {
@@ -92,18 +94,55 @@ export class CustomersService {
     return this.repo.removeAll();
   }
 
-  // Basic CSV parser for simple comma-separated files with header
+  // Parser CSV con soporte de campos entrecomillados: una dirección como
+  // "4a calle, zona 1" ya no parte la fila en dos columnas.
   private parseCsv(buffer: Buffer): { headers: string[]; rows: string[][] } {
-    const content = buffer.toString("utf8");
-    const lines = content.split(/\r?\n/).filter((l) => l.trim().length > 0);
-    if (lines.length === 0) return { headers: [], rows: [] };
-    const splitLine = (line: string) => {
-      // naive split: handles simple CSV without quoted commas
-      return line.split(",").map((s) => s.trim());
+    // BOM de Excel al inicio del archivo
+    const content = buffer.toString("utf8").replace(/^﻿/, "");
+
+    const records: string[][] = [];
+    let row: string[] = [];
+    let field = "";
+    let inQuotes = false;
+
+    const endField = () => {
+      row.push(field.trim());
+      field = "";
     };
-    const headers = splitLine(lines[0]).map((h) => h.toLowerCase());
-    const rows = lines.slice(1).map(splitLine);
-    return { headers, rows };
+    const endRow = () => {
+      endField();
+      if (row.some((c) => c.length > 0)) records.push(row);
+      row = [];
+    };
+
+    for (let i = 0; i < content.length; i++) {
+      const ch = content[i];
+
+      if (inQuotes) {
+        if (ch === '"') {
+          if (content[i + 1] === '"') {
+            field += '"'; // comilla escapada ("")
+            i++;
+          } else {
+            inQuotes = false;
+          }
+        } else {
+          field += ch;
+        }
+        continue;
+      }
+
+      if (ch === '"') inQuotes = true;
+      else if (ch === ",") endField();
+      else if (ch === "\r") continue;
+      else if (ch === "\n") endRow();
+      else field += ch;
+    }
+    endRow(); // última línea sin salto final
+
+    if (records.length === 0) return { headers: [], rows: [] };
+    const headers = records[0].map((h) => h.toLowerCase());
+    return { headers, rows: records.slice(1) };
   }
 
   // Import customers from CSV; detects duplicates by name+address and logs conflicts.
@@ -112,6 +151,11 @@ export class CustomersService {
     file: Express.Multer.File,
     mode: "append" | "replace" = "append"
   ) {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException(
+        'Falta el archivo CSV (campo "file") o está vacío.'
+      );
+    }
     let wiped = { tasks: 0, customers: 0 };
     if (mode === "replace") {
       wiped = await this.repo.removeAll();
@@ -143,7 +187,9 @@ export class CustomersService {
     const notesIdx = idx("notes") !== -1 ? idx("notes") : idx("notas");
 
     if (nameIdx === -1) {
-      throw new Error('CSV debe incluir columna "name" o "nombre"');
+      throw new BadRequestException(
+        'CSV debe incluir columna "name" o "nombre"'
+      );
     }
 
     const seenKeys = new Set<string>();
