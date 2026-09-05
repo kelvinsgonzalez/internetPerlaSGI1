@@ -296,7 +296,7 @@ export const router = createBrowserRouter(
       ],
     },
   ],
-  { future: futureFlags }
+  { future: futureFlags, basename: "/crm" }
 );
 
 export default router;

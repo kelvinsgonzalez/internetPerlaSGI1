@@ -1,8 +1,3 @@
-# Despliegue de producción en un VPS (probado contra Contabo + Ubuntu 24.04).
-# Variables en el archivo .env de esta misma carpeta (ver .env.prod.example).
-# Uso: docker compose -f docker-compose.prod.yml up -d --build
-
-# Sin límite de logs, journald/json-file llena el disco del VPS en semanas.
 x-logging: &default-logging
   driver: json-file
   options:
@@ -10,46 +5,9 @@ x-logging: &default-logging
     max-file: "5"
 
 services:
-  traefik:
-    image: traefik:v3.1
-    restart: unless-stopped
-    logging: *default-logging
-    command:
-      - --providers.docker=true
-      - --providers.docker.exposedByDefault=false
-      - --providers.docker.network=web
-      - --entrypoints.web.address=:80
-      - --entrypoints.web.http.redirections.entrypoint.to=websecure
-      - --entrypoints.web.http.redirections.entrypoint.scheme=https
-      - --entrypoints.websecure.address=:443
-      - --certificatesresolvers.le.acme.email=${ACME_EMAIL}
-      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
-      - --certificatesresolvers.le.acme.httpchallenge=true
-      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
-      - --log.level=INFO
-      - --accesslog=true
-    environment:
-      TZ: ${BUSINESS_TZ:-America/Guatemala}
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      # Sólo lectura: Traefik únicamente necesita descubrir contenedores.
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - traefik_letsencrypt:/letsencrypt
-    networks:
-      - web
-    labels:
-      # Cabeceras de seguridad aplicadas a frontend y backend.
-      - traefik.enable=true
-      - traefik.http.middlewares.sec-headers.headers.stsSeconds=31536000
-      - traefik.http.middlewares.sec-headers.headers.stsIncludeSubdomains=true
-      - traefik.http.middlewares.sec-headers.headers.contentTypeNosniff=true
-      - traefik.http.middlewares.sec-headers.headers.browserXssFilter=true
-      - traefik.http.middlewares.sec-headers.headers.referrerPolicy=strict-origin-when-cross-origin
-
-  db:
-    image: postgres:17-alpine
+  db-crm:
+    image: postgres:16-alpine
+    container_name: crm-db
     restart: unless-stopped
     logging: *default-logging
     environment:
@@ -58,49 +16,33 @@ services:
       POSTGRES_DB: ${DB_DATABASE}
       TZ: ${BUSINESS_TZ:-America/Guatemala}
     volumes:
-      - ip_db_data:/var/lib/postgresql/data
-    # Sin `ports`: la base sólo es visible dentro de la red interna.
+      - crm_pgdata:/var/lib/postgresql/data
     networks:
-      - internal
+      - internal-crm
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}"]
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
       start_period: 20s
 
-  backend:
+  backend-crm:
     build:
       context: ./apps/backend
+    container_name: crm-backend
     restart: unless-stopped
     logging: *default-logging
+    env_file: .env.prod
     environment:
-      PORT: 3000
-      NODE_ENV: production
-      TZ: ${BUSINESS_TZ:-America/Guatemala}
-      DB_HOST: db
+      DB_HOST: db-crm
       DB_PORT: 5432
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_DATABASE: ${DB_DATABASE}
-      # Postgres corre en la red interna del compose: TLS no aporta aquí.
-      DB_SSL: "false"
-      DB_SYNC: ${DB_SYNC:-false}
-      # Migraciones al arrancar. Alternativa: dejarlo en false y ejecutar
-      # `npm run migration:run:prod` manualmente dentro del contenedor.
+      TZ: ${BUSINESS_TZ:-America/Guatemala}
       DB_MIGRATIONS_RUN: ${DB_MIGRATIONS_RUN:-true}
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
-      BUSINESS_TZ: ${BUSINESS_TZ:-America/Guatemala}
-      AUTO_CLOSE_ENABLED: ${AUTO_CLOSE_ENABLED:-false}
-      CORS_ORIGINS: https://${FRONTEND_DOMAIN}
     depends_on:
-      db:
+      db-crm:
         condition: service_healthy
-    volumes:
-      - uploads:/app/uploads
     networks:
-      - internal
+      - internal-crm
       - web
     healthcheck:
       test:
@@ -113,50 +55,51 @@ services:
       retries: 5
       start_period: 30s
     labels:
-      - traefik.enable=true
-      - traefik.docker.network=web
-      - traefik.http.routers.backend.rule=Host(`${BACKEND_DOMAIN}`)
-      - traefik.http.routers.backend.entrypoints=websecure
-      - traefik.http.routers.backend.tls=true
-      - traefik.http.routers.backend.tls.certresolver=le
-      - traefik.http.routers.backend.middlewares=sec-headers@docker
-      - traefik.http.services.backend.loadbalancer.server.port=3000
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.crm-sec-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.crm-sec-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.crm-sec-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.crm-sec-headers.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.crm-sec-headers.headers.referrerPolicy=strict-origin-when-cross-origin"
+      - "traefik.http.routers.crm-api.rule=Host(`iperla.online`) && PathPrefix(`/crm/api`)"
+      - "traefik.http.routers.crm-api.entrypoints=websecure"
+      - "traefik.http.routers.crm-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.crm-api.middlewares=crm-api-strip,crm-sec-headers"
+      - "traefik.http.middlewares.crm-api-strip.stripprefix.prefixes=/crm"
+      - "traefik.http.services.crm-api.loadbalancer.server.port=3000"
+      - "traefik.http.routers.crm-ws.rule=Host(`iperla.online`) && PathPrefix(`/socket.io`)"
+      - "traefik.http.routers.crm-ws.entrypoints=websecure"
+      - "traefik.http.routers.crm-ws.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.crm-ws.service=crm-api"
 
-  frontend:
+  frontend-crm:
     build:
       context: ./apps/frontend
       args:
-        # Las VITE_* se hornean en el bundle durante el build, no en runtime:
-        # cambiarlas exige reconstruir la imagen del frontend.
-        VITE_API_URL: https://${BACKEND_DOMAIN}/api/v1
-        VITE_SOCKET_URL: https://${BACKEND_DOMAIN}
+        VITE_API_URL: https://iperla.online/crm/api/v1
+        VITE_SOCKET_URL: https://iperla.online
         VITE_MAPBOX_TOKEN: ${VITE_MAPBOX_TOKEN}
+        VITE_BASE_PATH: /crm
+    container_name: crm-frontend
     restart: unless-stopped
     logging: *default-logging
-    environment:
-      TZ: ${BUSINESS_TZ:-America/Guatemala}
     depends_on:
-      - backend
+      - backend-crm
     networks:
       - web
     labels:
-      - traefik.enable=true
-      - traefik.docker.network=web
-      - traefik.http.routers.frontend.rule=Host(`${FRONTEND_DOMAIN}`)
-      - traefik.http.routers.frontend.entrypoints=websecure
-      - traefik.http.routers.frontend.tls=true
-      - traefik.http.routers.frontend.tls.certresolver=le
-      - traefik.http.routers.frontend.middlewares=sec-headers@docker
-      - traefik.http.services.frontend.loadbalancer.server.port=80
+      - "traefik.enable=true"
+      - "traefik.http.routers.crm-frontend.rule=Host(`iperla.online`) && PathPrefix(`/crm`)"
+      - "traefik.http.routers.crm-frontend.entrypoints=websecure"
+      - "traefik.http.routers.crm-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.crm-frontend.middlewares=crm-sec-headers@docker"
+      - "traefik.http.services.crm-frontend.loadbalancer.server.port=80"
+
+volumes:
+  crm_pgdata:
 
 networks:
   web:
-    name: web
-    driver: bridge
-  internal:
-    driver: bridge
-
-volumes:
-  ip_db_data:
-  uploads:
-  traefik_letsencrypt:
+    external: true
+  internal-crm:
+    internal: true

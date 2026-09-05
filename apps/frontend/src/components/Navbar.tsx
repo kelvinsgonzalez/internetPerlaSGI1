@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function Navbar() {
   const { user, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const logoSrc = "/perla-logo.svg";
+  const logoSrc = "/crm/perla-logo.svg";
 
   const handleLinkClick = () => {
     setIsOpen(false);
