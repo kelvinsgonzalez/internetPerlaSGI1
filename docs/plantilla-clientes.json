@@ -1,0 +1,32 @@
+[
+  {
+    "nombre": "Ana Pérez López",
+    "direccion": "4a calle 5-23, zona 1",
+    "telefono": "55501111",
+    "ip": "10.0.0.11",
+    "latitud": "14.634900",
+    "longitud": "-90.506900",
+    "plan": "Plan 20MB",
+    "notas": "Cliente desde 2024"
+  },
+  {
+    "nombre": "Beto Ruiz",
+    "direccion": "Colonia El Bosque casa 12",
+    "telefono": "55502222",
+    "ip": "10.0.0.12",
+    "latitud": "14.640000",
+    "longitud": "-90.510000",
+    "plan": "Plan 10MB",
+    "notas": ""
+  },
+  {
+    "nombre": "Carla Méndez",
+    "direccion": "",
+    "telefono": "55503333",
+    "ip": "",
+    "latitud": "",
+    "longitud": "",
+    "plan": "Plan 20MB",
+    "notas": "Sin dirección confirmada"
+  }
+]

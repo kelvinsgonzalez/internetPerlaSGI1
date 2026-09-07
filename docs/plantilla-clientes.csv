@@ -1,0 +1,4 @@
+nombre,direccion,telefono,ip,latitud,longitud,plan,notas
+Ana Pérez López,"4a calle 5-23, zona 1",55501111,10.0.0.11,14.634900,-90.506900,Plan 20MB,Cliente desde 2024
+Beto Ruiz,Colonia El Bosque casa 12,55502222,10.0.0.12,14.640000,-90.510000,Plan 10MB,
+Carla Méndez,,55503333,,,,Plan 20MB,Sin dirección confirmada

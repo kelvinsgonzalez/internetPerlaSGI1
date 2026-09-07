@@ -94,12 +94,103 @@ export class CustomersService {
     return this.repo.removeAll();
   }
 
+  // Formato aceptado: CSV separado por comas (",") o JSON. El punto y coma
+  // que exporta Excel en español ya no se acepta: se pide reexportar el
+  // archivo o convertirlo con scripts/arreglar-csv-clientes.py.
+  private readonly FORMATO_REQUERIDO =
+    'Formatos aceptados: CSV separado por comas (",") o JSON. ' +
+    "Columnas/campos: nombre, direccion, telefono, ip, latitud, longitud, plan, notas. " +
+    'Ejemplo CSV: "nombre,direccion,telefono,ip,latitud,longitud,plan,notas". ' +
+    'Ejemplo JSON: [{"nombre":"Ana Pérez","direccion":"4a calle 5-23, zona 1",' +
+    '"telefono":"55501111","ip":"10.0.0.11","latitud":"14.634900",' +
+    '"longitud":"-90.506900","plan":"Plan 20MB","notas":""}]';
+
+  private isJsonFile(file: Express.Multer.File, content: string): boolean {
+    const name = (file.originalname || "").toLowerCase();
+    if (name.endsWith(".json")) return true;
+    if (name.endsWith(".csv")) return false;
+    if ((file.mimetype || "").includes("json")) return true;
+    const first = content.trimStart()[0];
+    return first === "[" || first === "{";
+  }
+
+  private parseFile(file: Express.Multer.File): {
+    headers: string[];
+    rows: string[][];
+  } {
+    // BOM de Excel al inicio del archivo
+    const content = file.buffer.toString("utf8").replace(/^﻿/, "");
+    return this.isJsonFile(file, content)
+      ? this.parseJson(content)
+      : this.parseCsv(content);
+  }
+
+  private parseJson(content: string): { headers: string[]; rows: string[][] } {
+    let parsed: any;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      throw new BadRequestException(
+        `El archivo JSON no es válido (no se pudo leer). ${this.FORMATO_REQUERIDO}`
+      );
+    }
+
+    // Se acepta un arreglo directo o un objeto que lo envuelva.
+    const list = Array.isArray(parsed)
+      ? parsed
+      : parsed?.clientes ?? parsed?.customers ?? parsed?.data;
+
+    if (!Array.isArray(list)) {
+      throw new BadRequestException(
+        `El JSON debe ser una lista de clientes. ${this.FORMATO_REQUERIDO}`
+      );
+    }
+    const objetos = list.filter(
+      (item) => item && typeof item === "object" && !Array.isArray(item)
+    );
+    if (objetos.length === 0) {
+      throw new BadRequestException(
+        `El JSON no contiene clientes. ${this.FORMATO_REQUERIDO}`
+      );
+    }
+
+    const headers: string[] = [];
+    for (const obj of objetos) {
+      for (const key of Object.keys(obj)) {
+        const h = key.trim().toLowerCase();
+        if (h && !headers.includes(h)) headers.push(h);
+      }
+    }
+
+    const rows = objetos.map((obj) => {
+      const porClave = new Map<string, string>();
+      for (const [key, value] of Object.entries(obj)) {
+        const h = key.trim().toLowerCase();
+        if (!h) continue;
+        porClave.set(
+          h,
+          value === null || value === undefined ? "" : String(value).trim()
+        );
+      }
+      return headers.map((h) => porClave.get(h) ?? "");
+    });
+
+    return { headers, rows };
+  }
+
   // Parser CSV con soporte de campos entrecomillados: una dirección como
   // "4a calle, zona 1" ya no parte la fila en dos columnas.
-  private parseCsv(buffer: Buffer): { headers: string[]; rows: string[][] } {
-    // BOM de Excel al inicio del archivo
-    const content = buffer.toString("utf8").replace(/^﻿/, "");
+  private parseCsv(content: string): { headers: string[]; rows: string[][] } {
+    const headerLine = content.split(/\r?\n/, 1)[0] || "";
+    if (!headerLine.includes(",") && /[;\t]/.test(headerLine)) {
+      const usado = headerLine.includes(";") ? '";"' : "tabulaciones";
+      throw new BadRequestException(
+        `El CSV usa ${usado} como separador y solo se acepta la coma (","). ` +
+          `Vuelve a exportarlo con comas. ${this.FORMATO_REQUERIDO}`
+      );
+    }
 
+    const delimiter = ",";
     const records: string[][] = [];
     let row: string[] = [];
     let field = "";
@@ -133,7 +224,7 @@ export class CustomersService {
       }
 
       if (ch === '"') inQuotes = true;
-      else if (ch === ",") endField();
+      else if (ch === delimiter) endField();
       else if (ch === "\r") continue;
       else if (ch === "\n") endRow();
       else field += ch;
@@ -153,14 +244,12 @@ export class CustomersService {
   ) {
     if (!file?.buffer?.length) {
       throw new BadRequestException(
-        'Falta el archivo CSV (campo "file") o está vacío.'
+        `Falta el archivo (campo "file") o está vacío. ${this.FORMATO_REQUERIDO}`
       );
     }
-    let wiped = { tasks: 0, customers: 0 };
-    if (mode === "replace") {
-      wiped = await this.repo.removeAll();
-    }
-    const { headers, rows } = this.parseCsv(file.buffer);
+    // Se valida el archivo antes de borrar nada: si el formato es inválido,
+    // el modo "replace" no debe dejar la base vacía.
+    const { headers, rows } = this.parseFile(file);
     const idx = (name: string) => headers.indexOf(name);
     const ipIdx = (() => {
       const ip = idx("ip");
@@ -188,8 +277,13 @@ export class CustomersService {
 
     if (nameIdx === -1) {
       throw new BadRequestException(
-        'CSV debe incluir columna "name" o "nombre"'
+        `El archivo debe incluir la columna "nombre" (o "name"). ${this.FORMATO_REQUERIDO}`
       );
+    }
+
+    let wiped = { tasks: 0, customers: 0 };
+    if (mode === "replace") {
+      wiped = await this.repo.removeAll();
     }
 
     const seenKeys = new Set<string>();

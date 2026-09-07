@@ -131,7 +131,7 @@ export default function ClientesAdminPage() {
 
   const onReplaceFile = async (file: File) => {
     const ok = confirm(
-      `Vas a REEMPLAZAR todos los clientes con el contenido del archivo "${file.name}". Esto borra todos los clientes existentes (y sus tareas) y luego carga el CSV. ¿Continuar?`
+      `Vas a REEMPLAZAR todos los clientes con el contenido del archivo "${file.name}". Esto borra todos los clientes existentes (y sus tareas) y luego carga el archivo. ¿Continuar?`
     );
     if (!ok) return;
     setBusy(true);
@@ -169,7 +169,7 @@ export default function ClientesAdminPage() {
                         </span>
                     </h1>
                     <p className="mt-3 max-w-3xl text-sm text-slate-600 sm:text-base">
-                        Administra tus clientes, importa desde CSV y revisa conflictos.
+                        Administra tus clientes, importa desde CSV o JSON y revisa conflictos.
                     </p>
                 </motion.div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -186,14 +186,14 @@ export default function ClientesAdminPage() {
                     onClick={() => replaceInputRef.current?.click()}
                     disabled={busy || loading}
                     whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                    title="Sube un CSV: borra todos los clientes anteriores y carga los nuevos"
+                    title="Sube un CSV (separado por comas) o JSON: borra todos los clientes anteriores y carga los nuevos"
                 >
-                    Reemplazar (CSV)
+                    Reemplazar (CSV/JSON)
                 </motion.button>
                 <input
                     ref={replaceInputRef}
                     type="file"
-                    accept=".csv,text/csv"
+                    accept=".csv,.json,text/csv,application/json"
                     className="hidden"
                     onChange={(e) => {
                       const f = e.target.files?.[0];
@@ -205,9 +205,9 @@ export default function ClientesAdminPage() {
                     onClick={() => { setImportMode("append"); setOpenImport(true); }}
                     disabled={busy || loading}
                     whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                    title="Sube un CSV: agrega los registros nuevos sin borrar los existentes"
+                    title="Sube un CSV (separado por comas) o JSON: agrega los registros nuevos sin borrar los existentes"
                 >
-                    Agregar (CSV)
+                    Agregar (CSV/JSON)
                 </motion.button>
                 <motion.button
                     className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30 hover:bg-emerald-600 transition-all disabled:opacity-60"
