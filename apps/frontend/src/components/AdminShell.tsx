@@ -1,5 +1,6 @@
 ﻿import { AnimatePresence, motion } from "framer-motion";
 import {
+  Archive,
   Bell,
   Boxes,
   ClipboardList,
@@ -71,6 +72,7 @@ const navItems = [
   { to: "/finance", label: "Finanzas", icon: DollarSign },
   { to: "/inventory", label: "Inventario", icon: Boxes },
   { to: "/tasks-admin", label: "Tareas", icon: ClipboardList },
+  { to: "/archivo-tareas", label: "Archivo de Tareas", icon: Archive },
   { to: "/admin/clientes", label: "Clientes", icon: Users },
   { to: "/workers", label: "Trabajadores", icon: Users2 },
   { to: "/mapa-de-ubicacion", label: "Mapa de Ubicacion", icon: Map },

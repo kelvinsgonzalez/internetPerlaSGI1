@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useSocket } from "../hooks/useSocket";
 import api from "../services/api";
 import { getCustomers } from "../services/customers";
+import { archiveTask } from "../services/taskArchive";
 import {
   createTask,
   deleteTask,
@@ -205,6 +206,29 @@ export default function TasksAdmin() {
       setReassignFor(null);
     }
   };
+  // Archivar deja la tarea guardada para siempre en el archivo de texto plano
+  // y la saca de la base, asi que solo se permite sobre tareas completadas.
+  const onArchive = async (t: Task) => {
+    if (t.status !== "COMPLETADA") {
+      toast.error("Solo se pueden archivar tareas completadas");
+      return;
+    }
+    const ok = window.confirm(
+      `Archivar "${t.title}"?\n\nLa tarea pasara al Archivo de Tareas (registro permanente) y se quitara de esta lista.`
+    );
+    if (!ok) return;
+
+    const prev = tasks.slice();
+    setTasks((curr) => curr.filter((x) => x.id !== t.id));
+    try {
+      await archiveTask(t.id);
+      toast.success("Tarea archivada");
+    } catch (e: any) {
+      setTasks(prev);
+      toast.error(e?.response?.data?.message || "No se pudo archivar la tarea");
+    }
+  };
+
   const onDelete = async (id: string) => {
     const prev = tasks.slice();
     setTasks((curr) => curr.filter((t) => t.id !== id));
@@ -395,6 +419,18 @@ export default function TasksAdmin() {
                         className="text-sky-600 hover:underline text-xs"
                       >
                         Editar
+                      </button>
+                      <button
+                        onClick={() => onArchive(t)}
+                        disabled={t.status !== "COMPLETADA"}
+                        title={
+                          t.status !== "COMPLETADA"
+                            ? "Solo se pueden archivar tareas completadas"
+                            : "Guardar en el Archivo de Tareas"
+                        }
+                        className="text-xs text-amber-600 hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
+                      >
+                        Archivar
                       </button>
                       <button
                         onClick={() => onDelete(t.id)}

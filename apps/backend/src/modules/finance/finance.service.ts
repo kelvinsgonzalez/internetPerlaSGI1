@@ -319,6 +319,11 @@ export class FinanceService {
     return this.cashSummary.listByDateRange(from, to);
   }
 
+  // Agregado diario calculado desde los movimientos (no depende del cierre)
+  listDailyAggregates(from: string, to: string) {
+    return this.cash.aggregateByDateRange(from, to);
+  }
+
   // Cierre diario por usuario (marca personal)
   async userCloseDay(date: string, userId?: string) {
     if (!userId) throw new BadRequestException("Missing userId");

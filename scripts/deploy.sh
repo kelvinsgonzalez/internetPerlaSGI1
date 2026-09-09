@@ -25,7 +25,7 @@ if grep -qE '^[A-Z_]+=CAMBIAME' .env; then
   grep -nE '^[A-Z_]+=CAMBIAME' .env
   fail "Hay variables sin rellenar en .env (las de arriba)."
 fi
-for var in FRONTEND_DOMAIN BACKEND_DOMAIN ACME_EMAIL DB_USERNAME DB_PASSWORD DB_DATABASE JWT_SECRET; do
+for var in FRONTEND_DOMAIN BACKEND_DOMAIN ACME_EMAIL DB_USERNAME DB_PASSWORD DB_DATABASE JWT_SECRET ADMIN_EMAIL; do
   grep -qE "^${var}=.+" .env || fail "Falta ${var} en .env"
 done
 
@@ -74,7 +74,13 @@ cat <<EOF
 
 Despliegue completo: https://${FRONTEND_DOMAIN}
 
-Si es la primera vez, crea el usuario administrador:
+Si es la primera vez, crea el usuario administrador (usa ADMIN_EMAIL del .env;
+deja SEED_ADMIN_PASSWORD vacia y el seed imprimira una contrasena aleatoria una
+sola vez):
   docker compose -f docker-compose.prod.yml exec backend npm run seed:prod
-y cambia de inmediato la contraseña de admin@example.com desde la app.
+Anotala, entra y cambiala desde Ajustes de Administracion -> Mi cuenta.
+
+Si la base ya existia con un admin anterior, define LEGACY_ADMIN_EMAIL en el
+.env: las migraciones lo trasladan solas a ADMIN_EMAIL al arrancar
+(DB_MIGRATIONS_RUN=true) y ese correo queda retirado.
 EOF

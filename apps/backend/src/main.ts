@@ -6,6 +6,11 @@ import { getAllowedOrigins } from './common/cors';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Detrás de Traefik la IP de origen llega en X-Forwarded-For. Sin esto,
+  // `req.ip` sería siempre la del proxy y el freno de fuerza bruta castigaría a
+  // todos los usuarios por igual en lugar de al atacante.
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
   app.enableCors({
     origin: getAllowedOrigins(),
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',

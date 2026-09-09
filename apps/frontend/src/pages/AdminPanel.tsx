@@ -2,17 +2,31 @@ import type { ElementType } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Activity, ArrowUpRight, Boxes, CalendarRange, Layers, RefreshCw, ShieldAlert, Sparkles, TrendingUp, Users2 } from 'lucide-react';
+import { ArrowUpRight, BarChart3, CalendarRange, ClipboardList, Layers, Sparkles, TrendingUp, Wallet } from 'lucide-react';
 import api from '../services/api';
 
-type Att = { id: string; createdAt?: string };
-type Cust = { id: string };
 type Stock = { id: string; quantity: number; item: { id: string } };
 type Item = { id: string; name: string; minStock: number; updatedAt?: string; createdAt?: string };
+type Task = { id: string; status?: string };
+type DailyCash = { date: string; incomes: number; expenses: number; balance: number };
 
-
+const PENDING_STATUSES = ['PENDIENTE', 'EN_PROCESO'];
 
 const glassCard = 'backdrop-blur-xl bg-white/80 shadow-xl shadow-emerald-100/60 border border-white/30';
+
+const toISO = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+
+const formatQ = (n: number) =>
+  new Intl.NumberFormat('es-GT', { style: 'currency', currency: 'GTQ', maximumFractionDigits: 2 }).format(n);
+
+// Lunes de la semana en curso
+const startOfWeek = (ref: Date) => {
+  const day = ref.getDay();
+  const monday = new Date(ref);
+  monday.setDate(ref.getDate() + (day === 0 ? -6 : 1 - day));
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+};
 
 const StatCard = ({
   icon: Icon,
@@ -22,6 +36,7 @@ const StatCard = ({
   delta,
   loading,
   to,
+  children,
 }: {
   icon: ElementType;
   title: string;
@@ -30,12 +45,13 @@ const StatCard = ({
   delta: string;
   loading: boolean;
   to?: string;
+  children?: React.ReactNode;
 }) => {
   const card = (
     <motion.div
       whileHover={{ translateY: -6, rotateX: 2 }}
       transition={{ type: 'spring', stiffness: 200, damping: 18 }}
-      className={`${glassCard} relative overflow-hidden rounded-3xl p-5 text-slate-900 ${to ? 'cursor-pointer' : ''}`}
+      className={`${glassCard} relative h-full overflow-hidden rounded-3xl p-5 text-slate-900 ${to ? 'cursor-pointer' : ''}`}
     >
       <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-transparent to-sky-500/10" />
       <div className="relative flex items-center justify-between">
@@ -48,30 +64,101 @@ const StatCard = ({
           <Icon className="h-6 w-6" />
         </div>
       </div>
+      {children}
       <div className="mt-6 flex items-center gap-2 text-xs font-semibold text-emerald-600">
         <TrendingUp className="h-3.5 w-3.5" />
         {delta}
       </div>
     </motion.div>
   );
-  return to ? <Link to={to} className="block">{card}</Link> : card;
+  return to ? <Link to={to} className="block h-full">{card}</Link> : card;
 };
 
-const Sparkline = ({ data }: { data: number[] }) => {
+// Barras diarias de ingresos de la semana (solo forma, sin cifras)
+const WeekBars = ({ data }: { data: number[] }) => {
   const max = Math.max(...data, 1);
+  const labels = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
   return (
-    <div className="flex h-24 items-end gap-1">
-      {data.map((value, index) => {
-        const height = Math.max(6, Math.round((value / max) * 100));
-        return (
+    <div className="mt-4 flex h-16 items-end gap-1.5">
+      {data.map((value, index) => (
+        <div key={index} className="flex flex-1 flex-col items-center gap-1">
           <motion.div
-            key={index}
-            className="flex-1 rounded-full bg-gradient-to-t from-emerald-500/30 via-emerald-500/60 to-emerald-400"
-            style={{ height: `${height}%` }}
-            transition={{ duration: 0.4, delay: index * 0.03 }}
+            className="w-full rounded-full bg-gradient-to-t from-emerald-500/30 via-emerald-500/60 to-emerald-400"
+            initial={{ height: 0 }}
+            animate={{ height: `${Math.max(8, Math.round((value / max) * 100))}%` }}
+            transition={{ duration: 0.5, delay: index * 0.04 }}
           />
-        );
-      })}
+          <span className="text-[9px] font-semibold text-slate-400">{labels[index]}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Comparativa mes actual vs mes anterior: únicamente gráfica, sin valores.
+const MonthComparisonChart = ({
+  current,
+  previous,
+  labels,
+}: {
+  current: number[];
+  previous: number[];
+  labels: string[];
+}) => {
+  const max = Math.max(...current, ...previous, 1);
+  return (
+    <div>
+      <div className="flex items-center gap-5 text-[11px] font-semibold text-slate-500">
+        <span className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Mes actual
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-slate-300" /> Mes anterior
+        </span>
+      </div>
+      <div className="mt-6 flex h-56 items-end gap-4">
+        {labels.map((label, index) => (
+          <div key={label} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
+            <div className="flex h-full w-full items-end justify-center gap-1.5">
+              <motion.div
+                className="w-1/2 max-w-[26px] rounded-t-xl bg-gradient-to-t from-emerald-500/40 via-emerald-500/70 to-emerald-400"
+                initial={{ height: 0 }}
+                animate={{ height: `${Math.max(3, Math.round(((current[index] || 0) / max) * 100))}%` }}
+                transition={{ duration: 0.7, delay: 0.05 * index, ease: 'easeOut' }}
+              />
+              <motion.div
+                className="w-1/2 max-w-[26px] rounded-t-xl bg-gradient-to-t from-slate-200 via-slate-300 to-slate-300"
+                initial={{ height: 0 }}
+                animate={{ height: `${Math.max(3, Math.round(((previous[index] || 0) / max) * 100))}%` }}
+                transition={{ duration: 0.7, delay: 0.05 * index + 0.05, ease: 'easeOut' }}
+              />
+            </div>
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Proporción visual del mes actual frente al anterior (sin números)
+const ComparisonGauge = ({ current, previous }: { current: number; previous: number }) => {
+  const total = current + previous;
+  const share = total > 0 ? (current / total) * 100 : 50;
+  return (
+    <div>
+      <div className="h-4 w-full overflow-hidden rounded-full bg-slate-200/70">
+        <motion.div
+          className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-600"
+          initial={{ width: 0 }}
+          animate={{ width: `${share}%` }}
+          transition={{ duration: 1, ease: 'easeOut' }}
+        />
+      </div>
+      <div className="mt-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+        <span>Mes actual</span>
+        <span>Mes anterior</span>
+      </div>
     </div>
   );
 };
@@ -111,33 +198,33 @@ const ProgressRing = ({ percent }: { percent: number }) => {
 };
 
 export default function AdminPanel() {
-
-  const [att, setAtt] = useState<Att[]>([]);
-  const [cust, setCust] = useState<Cust[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [daily, setDaily] = useState<DailyCash[]>([]);
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
   const load = async () => {
-    setRefreshing(true);
     setLoading(true);
+    const now = new Date();
+    // Desde el inicio del mes anterior para poder comparar los dos meses.
+    const from = toISO(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+    const to = toISO(new Date(now.getFullYear(), now.getMonth() + 1, 0));
     try {
-      const [a, c, s, i] = await Promise.all([
-        api.get('/attendance'),
-        api.get('/customers'),
+      const [t, d, s, i] = await Promise.all([
+        api.get('/tasks'),
+        api.get('/finance/cash-daily', { params: { from, to } }),
         api.get('/inventory/stocks'),
         api.get('/inventory/items'),
       ]);
-      setAtt(a.data);
-      setCust(c.data);
-      setStocks(s.data);
-      setItems(i.data);
+      setTasks(t.data || []);
+      setDaily(d.data || []);
+      setStocks(s.data || []);
+      setItems(i.data || []);
     } catch (error) {
       console.warn('No se pudo cargar el dashboard administrativo', error);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
@@ -145,6 +232,56 @@ export default function AdminPanel() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const pendingTasks = useMemo(
+    () => tasks.filter((task) => PENDING_STATUSES.includes(String(task.status || '').toUpperCase())).length,
+    [tasks],
+  );
+
+  // Ingresos de la semana en curso (lunes a domingo)
+  const week = useMemo(() => {
+    const monday = startOfWeek(new Date());
+    const days = Array.from({ length: 7 }, (_, idx) => {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + idx);
+      return toISO(date);
+    });
+    const byDate = new Map(daily.map((row) => [String(row.date).slice(0, 10), row]));
+    const series = days.map((iso) => Number(byDate.get(iso)?.incomes || 0));
+    return { series, total: series.reduce((acc, cur) => acc + cur, 0) };
+  }, [daily]);
+
+  // Comparativa de ingresos por semana del mes: actual vs anterior
+  const comparison = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const previous = new Date(currentYear, currentMonth - 1, 1);
+
+    const buckets = (month: number, year: number) => {
+      const totals = [0, 0, 0, 0, 0];
+      for (const row of daily) {
+        const iso = String(row.date).slice(0, 10);
+        const [y, m, d] = iso.split('-').map(Number);
+        if (y !== year || m - 1 !== month) continue;
+        const index = Math.min(4, Math.floor((d - 1) / 7));
+        totals[index] += Number(row.incomes || 0);
+      }
+      return totals;
+    };
+
+    const current = buckets(currentMonth, currentYear);
+    const prev = buckets(previous.getMonth(), previous.getFullYear());
+    return {
+      current,
+      previous: prev,
+      labels: ['S1', 'S2', 'S3', 'S4', 'S5'],
+      currentTotal: current.reduce((acc, cur) => acc + cur, 0),
+      previousTotal: prev.reduce((acc, cur) => acc + cur, 0),
+      previousLabel: previous.toLocaleDateString('es-ES', { month: 'long' }),
+      currentLabel: now.toLocaleDateString('es-ES', { month: 'long' }),
+    };
+  }, [daily]);
 
   const totals = useMemo(() => {
     const accumulator: Record<string, number> = {};
@@ -164,34 +301,11 @@ export default function AdminPanel() {
     return Math.max(0, Math.round((safe / items.length) * 100));
   }, [items.length, lowStock.length]);
 
-  const attendanceTrend = useMemo(() => {
-    if (!att.length) return new Array(7).fill(0);
-    const today = new Date();
-    const buckets = Array.from({ length: 7 }, (_, idx) => {
-      const date = new Date(today);
-      date.setDate(today.getDate() - (6 - idx));
-      return { label: date.toLocaleDateString('es-ES', { weekday: 'short' }), key: date.toISOString().slice(0, 10), count: 0 };
-    });
-    const entriesWithDate = att.filter((record) => (record as any).createdAt);
-    if (entriesWithDate.length === 0) {
-      const avg = Math.max(1, Math.round(att.length / 7));
-      return buckets.map(() => avg);
-    }
-    for (const record of entriesWithDate) {
-      const iso = new Date((record as any).createdAt!).toISOString().slice(0, 10);
-      const bucket = buckets.find((b) => b.key === iso);
-      if (bucket) bucket.count += 1;
-    }
-    return buckets.map((b) => b.count);
-  }, [att]);
-
   const quickActions = [
     { label: 'Crear tarea', description: 'Coordina responsabilidades críticas.', to: '/tasks-admin' },
     { label: 'Agregar inventario', description: 'Actualiza existencias en segundos.', to: '/inventory' },
     { label: 'Nueva comunicación', description: 'Inicia una conversación con el equipo.', to: '/messages' },
   ];
-
-
 
   return (
     <div className="relative min-h-full overflow-hidden px-3 py-4 sm:px-6 lg:px-10">
@@ -223,163 +337,139 @@ export default function AdminPanel() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7 }}
             >
-              Visualiza la salud operacional de inmediato: estado de asistencia, clientes activos, inventario y focos críticos en tiempo real.
+              Tareas pendientes, ingresos de la semana y la evolución del mes frente al anterior, en una sola vista.
             </motion.p>
           </div>
-
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-4">
+        <div className="grid gap-6 lg:grid-cols-2">
           <StatCard
-            icon={Activity}
-            title="Asistencia"
-            value={`${att.length}`}
-            hint="Registros totales sincronizados"
-            delta="Seguimiento impecable esta semana"
+            icon={ClipboardList}
+            title="Tareas pendientes"
+            value={`${pendingTasks}`}
+            hint="Incluye pendientes y en proceso"
+            delta={pendingTasks === 0 ? 'Sin trabajo pendiente' : 'Dales seguimiento con tu equipo'}
             loading={loading}
-            to="/attendance"
+            to="/tasks-admin"
           />
           <StatCard
-            icon={Users2}
-            title="Clientes"
-            value={`${cust.length}`}
-            hint="Clientes gestionados en CRM"
-            delta="Experiencia positiva con respuestas rápidas"
+            icon={Wallet}
+            title="Ingresos de la semana"
+            value={formatQ(week.total)}
+            hint="Total de la semana en curso (lunes a domingo)"
+            delta="Actualizado con los movimientos de caja"
             loading={loading}
-            to="/admin/clientes"
-          />
-          <StatCard
-            icon={Boxes}
-            title="Items activos"
-            value={`${items.length}`}
-            hint="Portafolio vigente en inventario"
-            delta="Actualización continua garantizada"
-            loading={loading}
-            to="/inventory"
-          />
-          <StatCard
-            icon={ShieldAlert}
-            title="Alertas"
-            value={`${lowStock.length}`}
-            hint="Productos en umbral crítico"
-            delta={lowStock.length === 0 ? 'Todo bajo control' : 'Toma acción antes del quiebre'}
-            loading={loading}
-            to="/inventory"
-          />
+            to="/finance"
+          >
+            <WeekBars data={week.series} />
+          </StatCard>
         </div>
 
         <div className="grid gap-6 xl:grid-cols-5">
-          <Link to="/attendance" className="block xl:col-span-3">
           <motion.div
-            className={`${glassCard} rounded-3xl p-6 cursor-pointer`}
+            className={`${glassCard} rounded-3xl p-6 xl:col-span-3`}
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">Pulso de asistencia semanal</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Ingresos: {comparison.currentLabel} vs {comparison.previousLabel}</h2>
               <span className="flex items-center gap-1 rounded-full bg-emerald-100/70 px-3 py-1 text-[11px] font-semibold text-emerald-700">
-                <CalendarRange className="h-3.5 w-3.5" /> Últimos 7 días
+                <BarChart3 className="h-3.5 w-3.5" /> Comparativa mensual
               </span>
             </div>
-            <p className="mt-1 text-xs text-slate-500">Verifica el ritmo de asistencia y anticipa desviaciones antes de que afecten la operación.</p>
-            <div className="mt-6">
-              <Sparkline data={attendanceTrend} />
-            </div>
-            <div className="mt-6 grid grid-cols-3 gap-4 text-xs">
-              <div>
-                <p className="text-slate-500">Pico diario</p>
-                <p className="mt-1 text-lg font-semibold text-slate-800">{Math.max(...attendanceTrend, 0)}</p>
-              </div>
-              <div>
-                <p className="text-slate-500">Promedio</p>
-                <p className="mt-1 text-lg font-semibold text-slate-800">
-                  {attendanceTrend.length ? Math.round(attendanceTrend.reduce((acc, cur) => acc + cur, 0) / attendanceTrend.length) : 0}
-                </p>
-              </div>
-              <div>
-                <p className="text-slate-500">Registros totales</p>
-                <p className="mt-1 text-lg font-semibold text-slate-800">{att.length}</p>
-              </div>
+            <p className="mt-1 text-xs text-slate-500">Compara la forma de los ingresos semana a semana frente al mes anterior.</p>
+            <div className="mt-4">
+              <MonthComparisonChart current={comparison.current} previous={comparison.previous} labels={comparison.labels} />
             </div>
           </motion.div>
-          </Link>
 
-          <Link to="/inventory" className="block xl:col-span-2">
           <motion.div
-            className={`${glassCard} flex flex-col justify-between rounded-3xl p-6 cursor-pointer h-full`}
+            className={`${glassCard} flex flex-col justify-between rounded-3xl p-6 xl:col-span-2`}
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
+            transition={{ duration: 0.6, delay: 0.15 }}
           >
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">Salud del inventario</h2>
-              <ArrowUpRight className="h-4 w-4 text-emerald-500" />
+            <div>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-slate-900">Peso del mes</h2>
+                <CalendarRange className="h-4 w-4 text-emerald-500" />
+              </div>
+              <p className="mt-1 text-xs text-slate-500">Proporción visual de los ingresos acumulados del mes actual frente al mes anterior.</p>
             </div>
-            <p className="mt-1 text-xs text-slate-500">Proporción de ítems sin alerta en relación al catálogo completo.</p>
-            <div className="mt-6 flex items-center justify-between gap-6">
-              <ProgressRing percent={inventoryCoverage} />
-              <div className="space-y-4 text-xs">
-                <div>
-                  <p className="text-slate-500">Ítems seguros</p>
-                  <p className="mt-1 text-base font-semibold text-slate-800">{items.length - lowStock.length}</p>
-                </div>
-                <div>
-                  <p className="text-slate-500">En riesgo</p>
-                  <p className="mt-1 text-base font-semibold text-rose-600">{lowStock.length}</p>
-                </div>
-                <div>
-                  <p className="text-slate-500">Cobertura estimada</p>
-                  <p className="mt-1 text-base font-semibold text-emerald-600">{inventoryCoverage}%</p>
-                </div>
+            <div className="mt-8">
+              <ComparisonGauge current={comparison.currentTotal} previous={comparison.previousTotal} />
+            </div>
+            <div className="mt-8">
+              <div className="flex h-24 items-end gap-3">
+                <motion.div
+                  className="flex-1 rounded-t-2xl bg-gradient-to-t from-emerald-500/40 via-emerald-500/70 to-emerald-400"
+                  initial={{ height: 0 }}
+                  animate={{
+                    height: `${Math.max(
+                      6,
+                      Math.round(
+                        (comparison.currentTotal / Math.max(comparison.currentTotal, comparison.previousTotal, 1)) * 100,
+                      ),
+                    )}%`,
+                  }}
+                  transition={{ duration: 0.9, ease: 'easeOut' }}
+                />
+                <motion.div
+                  className="flex-1 rounded-t-2xl bg-gradient-to-t from-slate-200 via-slate-300 to-slate-300"
+                  initial={{ height: 0 }}
+                  animate={{
+                    height: `${Math.max(
+                      6,
+                      Math.round(
+                        (comparison.previousTotal / Math.max(comparison.currentTotal, comparison.previousTotal, 1)) * 100,
+                      ),
+                    )}%`,
+                  }}
+                  transition={{ duration: 0.9, delay: 0.1, ease: 'easeOut' }}
+                />
+              </div>
+              <div className="mt-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                <span className="flex-1 text-center">Actual</span>
+                <span className="flex-1 text-center">Anterior</span>
               </div>
             </div>
           </motion.div>
-          </Link>
         </div>
 
         <div className="grid gap-6 xl:grid-cols-5">
           <Link to="/inventory" className="block xl:col-span-3">
-          <motion.div
-            className={`${glassCard} rounded-3xl p-6 cursor-pointer`}
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">Alertas de stock mínimo</h2>
-              <span className="rounded-full bg-rose-100/70 px-3 py-1 text-[11px] font-semibold text-rose-600">{lowStock.length} pendientes</span>
-            </div>
-            <p className="mt-1 text-xs text-slate-500">Prioriza los reabastecimientos críticos antes de que impacten el servicio.</p>
-            <div className="mt-5 space-y-3">
-              {lowStock.length === 0 && <p className="text-sm text-slate-500">Todo impecable: no hay alertas activas.</p>}
-              <AnimatePresence>
-                {lowStock.slice(0, 6).map((item) => (
+            <motion.div
+              className={`${glassCard} flex h-full flex-col justify-between rounded-3xl p-6 cursor-pointer`}
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-slate-900">Salud del inventario</h2>
+                <ArrowUpRight className="h-4 w-4 text-emerald-500" />
+              </div>
+              <p className="mt-1 text-xs text-slate-500">Proporción de ítems sin alerta en relación al catálogo completo.</p>
+              <div className="mt-6 flex items-center justify-between gap-6">
+                <ProgressRing percent={inventoryCoverage} />
+                <AnimatePresence>
                   <motion.div
-                    key={item.id}
-                    className="flex items-center justify-between rounded-2xl border border-emerald-100/70 bg-white/70 px-4 py-3 shadow-sm"
-                    initial={{ opacity: 0, x: -24 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 24 }}
-                    transition={{ duration: 0.3 }}
+                    className="flex-1 rounded-2xl border border-emerald-100/70 bg-white/70 px-4 py-3 text-xs text-slate-500 shadow-sm"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
                   >
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800">{item.name || 'Ítem sin nombre'}</p>
-                      <p className="text-xs text-slate-500">Umbral mínimo {item.minStock}</p>
-                    </div>
-                    <span className="rounded-full bg-rose-500/10 px-3 py-1 text-[11px] font-semibold text-rose-600">Reposición urgente</span>
+                    Cobertura estimada del catálogo activo.
                   </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-          </motion.div>
+                </AnimatePresence>
+              </div>
+            </motion.div>
           </Link>
 
           <motion.div
             className={`${glassCard} rounded-3xl p-6 xl:col-span-2`}
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.35 }}
+            transition={{ duration: 0.6, delay: 0.25 }}
           >
             <h2 className="text-lg font-semibold text-slate-900">Acciones inmediatas</h2>
             <p className="mt-1 text-xs text-slate-500">Impulsa decisiones con atajos inteligentes.</p>

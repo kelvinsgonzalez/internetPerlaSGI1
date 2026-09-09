@@ -54,3 +54,17 @@ if docker volume inspect "$UPLOADS_VOL" >/dev/null 2>&1; then
 else
   echo "Aviso: no existe el volumen '$UPLOADS_VOL'; revisa 'docker volume ls'."
 fi
+
+# El Archivo de Tareas es un log de texto plano que vive fuera de la base:
+# si no se respalda, un borrado del volumen se lo lleva para siempre.
+ARCHIVE_VOL="${PROJECT}_task_archive"
+
+if docker volume inspect "$ARCHIVE_VOL" >/dev/null 2>&1; then
+  ARCHIVE_OUT="$BACKUP_DIR/task-archive-$STAMP.tar.gz"
+  docker run --rm -v "$ARCHIVE_VOL":/data:ro -v "$BACKUP_DIR":/backup alpine \
+    tar czf "/backup/$(basename "$ARCHIVE_OUT")" -C /data .
+  echo "Archivo de tareas: $ARCHIVE_OUT ($(du -h "$ARCHIVE_OUT" | cut -f1))"
+  find "$BACKUP_DIR" -name 'task-archive-*.tar.gz' -mtime "+$RETENTION_DAYS" -delete
+else
+  echo "Aviso: aun no existe el volumen '$ARCHIVE_VOL' (se crea al archivar la primera tarea)."
+fi

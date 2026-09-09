@@ -98,6 +98,12 @@ export class TasksController {
     return this.service.complete(id, req.user.userId, url);
   }
 
+  @Post(":id/archive")
+  @Roles("ADMIN")
+  archive(@Param("id") id: string, @Req() req: any) {
+    return this.service.archive(id, req.user.userId);
+  }
+
   @Patch(":id")
   update(@Param("id") id: string, @Body() dto: UpdateTaskDto, @Req() req: any) {
     return this.service.update(

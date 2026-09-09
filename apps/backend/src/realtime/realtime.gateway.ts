@@ -1,6 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
+import { UsersRepository } from "../repositories/users.repository";
+import { isRetiredEmail } from "../common/security";
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -25,12 +27,20 @@ type JwtPayload = { sub: string; role?: "ADMIN" | "USER"; email?: string };
 export class RealtimeGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
-  constructor(private jwt: JwtService, private cfg: ConfigService) {}
+  constructor(
+    private jwt: JwtService,
+    private cfg: ConfigService,
+    private users: UsersRepository,
+  ) {}
 
   @WebSocketServer()
   server: Server;
 
-  handleConnection(client: Socket) {
+  // La firma válida no basta, igual que en el API HTTP: se comprueba el estado
+  // actual del usuario. Si no, un token robado seguiría recibiendo los eventos
+  // en tiempo real (incluidos los del canal de administradores) durante días,
+  // aunque se hubiera bloqueado la cuenta o cambiado la contraseña.
+  async handleConnection(client: Socket) {
     try {
       const token =
         (client.handshake.auth as any)?.token ||
@@ -42,10 +52,26 @@ export class RealtimeGateway
       const payload = this.jwt.verify<JwtPayload>(token, {
         secret: this.cfg.get<string>("JWT_SECRET"),
       });
-      (client.data as any).userId = payload.sub;
-      (client.data as any).role = payload.role;
-      client.join(`user:${payload.sub}`);
-      if (payload.role === "ADMIN") client.join("role:ADMIN");
+
+      const user = await this.users.findById(payload.sub);
+      if (!user || user.isBlocked || isRetiredEmail(user.email)) {
+        client.disconnect(true);
+        return;
+      }
+      if (user.passwordChangedAt && (payload as any).iat) {
+        const changedAt = Math.floor(user.passwordChangedAt.getTime() / 1000);
+        if ((payload as any).iat < changedAt - 1) {
+          client.disconnect(true);
+          return;
+        }
+      }
+
+      // El rol sale de la base, no del token: un descenso de ADMIN a USER surte
+      // efecto en la siguiente conexión y no espera a que caduque el JWT.
+      (client.data as any).userId = user.id;
+      (client.data as any).role = user.role;
+      client.join(`user:${user.id}`);
+      if (user.role === "ADMIN") client.join("role:ADMIN");
     } catch {
       client.disconnect(true);
     }

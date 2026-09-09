@@ -7,7 +7,8 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
       POSTGRES_DB: ${DB_DATABASE:-internetperla}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      # Sólo accesible desde la propia máquina, no desde la red local.
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       - ip_db_data:/var/lib/postgresql/data
   backend:
@@ -21,14 +22,23 @@ services:
       DB_DATABASE: ${DB_DATABASE:-internetperla}
       DB_SSL: ${DB_SSL:-false}
       DB_SYNC: ${DB_SYNC:-true}
-      JWT_SECRET: ${JWT_SECRET:-supersecretjwt}
+      # Sin valor por defecto: un secreto de firma escrito en el repositorio es
+      # un secreto quemado. Genéralo con `openssl rand -hex 32` en tu `.env`.
+      JWT_SECRET: ${JWT_SECRET:?define JWT_SECRET en .env (openssl rand -hex 32)}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      # Identidad del administrador: fuera del código y fuera del repositorio.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      LEGACY_ADMIN_EMAIL: ${LEGACY_ADMIN_EMAIL:-}
+      RETIRED_EMAILS: ${RETIRED_EMAILS:-}
+      # Archivo de Tareas: fichero de texto plano, fuera de la base de datos.
+      TASK_ARCHIVE_DIR: /app/data
     depends_on:
       - db
     ports:
       - "3000:3000"
     volumes:
       - uploads:/app/uploads
+      - task_archive:/app/data
   frontend:
     build: ./apps/frontend
     environment:
@@ -44,3 +54,4 @@ services:
 volumes:
   ip_db_data:
   uploads:
+  task_archive:

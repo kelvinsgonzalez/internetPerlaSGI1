@@ -60,4 +60,10 @@ export class User {
 
   @Column({ type: 'boolean', default: false })
   isBlocked: boolean;
+
+  // Último cambio de contraseña. `JwtStrategy` invalida los tokens emitidos
+  // antes de esta fecha, para que un cambio de contraseña cierre de verdad las
+  // sesiones abiertas con el token anterior.
+  @Column({ type: 'timestamptz', nullable: true })
+  passwordChangedAt?: Date | null;
 }

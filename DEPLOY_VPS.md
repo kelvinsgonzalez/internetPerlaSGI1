@@ -129,9 +129,9 @@ openssl rand -base64 32   # -> DB_PASSWORD
 openssl rand -hex 32      # -> JWT_SECRET
 ```
 
-> **No reutilices** el `JWT_SECRET` ni la contraseña de base de datos que
-> estuvieron commiteados en `apps/backend/.env.local`: deben considerarse
-> comprometidos.
+> Genera valores **nuevos**. Cualquier secreto que haya pasado alguna vez por
+> el repositorio o por un canal compartido debe considerarse comprometido y no
+> volver a usarse.
 
 Despliega:
 
@@ -142,16 +142,45 @@ bash scripts/deploy.sh
 El script valida el `.env`, respalda la base si ya existía, construye las
 imágenes, levanta todo y espera a que el backend quede `healthy`.
 
-### 4.1 Crear el primer administrador
+### 4.1 Migrar el administrador antiguo (bases ya existentes)
+
+Define en el `.env` del VPS el correo antiguo y el nuevo:
+
+```
+LEGACY_ADMIN_EMAIL=<correo del admin anterior>
+ADMIN_EMAIL=<correo del admin nuevo>
+```
+
+Con `DB_MIGRATIONS_RUN=true` (el valor por defecto) la migración corre sola al
+arrancar el backend. Para forzarla a mano:
+
+```bash
+docker compose -f docker-compose.prod.yml exec backend npm run migration:run:prod
+```
+
+`MigrateLegacyAdminEmail` traslada la cuenta conservando id, rol e historial, y
+reescribe las columnas de auditoría donde el correo quedó copiado como texto
+(`cash_daily_summary.closedBy`, `cash_entry.createdBy`, `attendance_record.name`).
+La contraseña **no** cambia: sigue siendo la que tuviera esa cuenta.
+
+Mientras `LEGACY_ADMIN_EMAIL` siga definido, ese correo queda retirado: el
+backend rechaza su login, su token deja de valer y no se puede volver a crear.
+En instalaciones nuevas deja la variable vacía.
+
+### 4.2 Crear el primer administrador (bases nuevas)
+
+En el `.env`, define `ADMIN_EMAIL` y deja `SEED_ADMIN_PASSWORD` **vacía**; el
+seed generará una contraseña aleatoria y la mostrará una única vez:
 
 ```bash
 docker compose -f docker-compose.prod.yml exec backend npm run seed:prod
 ```
 
-Crea `admin@example.com` / `123456`. **Entra y cambia esa contraseña de
-inmediato**, o borra el usuario tras crear el tuyo desde el panel.
+Anótala, entra y cámbiala de inmediato desde *Ajustes de Administración →
+Mi cuenta*. Ninguna credencial queda escrita en el repositorio, y el seed no
+crea cuentas de prueba con `NODE_ENV=production`.
 
-### 4.2 Verificación
+### 4.3 Verificación
 
 ```bash
 curl https://api.tudominio.com/api/v1/health     # -> {"status":"ok"}
@@ -321,12 +350,12 @@ Ya aplicado en el repositorio:
 
 Pendiente, en orden de valor:
 
-1. **Rotar las credenciales comprometidas** — la contraseña de Neon, el `JWT_SECRET`
-   y el token de Mapbox estuvieron en `apps/backend/.env.local`, versionado desde el
-   commit inicial. Sacarlo del índice no lo borra del historial: hace falta rotar, y
-   opcionalmente limpiar con `git filter-repo`.
+1. **Rotar todo secreto que haya estado en el historial de git** — sacar un archivo
+   del índice no lo borra del historial. Rotar es obligatorio; limpiar el historial
+   con `git filter-repo` es opcional y adicional, nunca sustituto.
 2. Copiar los backups fuera del VPS.
-3. Rate limiting en el backend (`@nestjs/throttler`) o vía middleware de Traefik.
+3. Rate limiting a nivel de borde (middleware de Traefik). El backend ya frena
+   la fuerza bruta en login y cambio de contraseña.
 4. Monitoreo de uptime (Uptime Kuma cabe en el mismo VPS).
 5. Actualizar dependencias con vulnerabilidades que exigen saltos mayores
    (NestJS 12, Vite 8, react-router 7).

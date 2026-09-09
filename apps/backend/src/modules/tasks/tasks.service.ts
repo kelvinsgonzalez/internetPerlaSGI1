@@ -8,6 +8,8 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { RealtimeGateway } from "../../realtime/realtime.gateway";
 import { Customer } from "../customers/customer.entity";
+import { TaskArchiveService } from "../task-archive/task-archive.service";
+import { ArchivedTask } from "../task-archive/task-archive.types";
 import { User } from "../users/user.entity";
 import { CreateTaskDto, UpdateTaskDto } from "./dto";
 import { Task } from "./task.entity";
@@ -18,7 +20,8 @@ export class TasksService {
     @InjectRepository(Task) private tasks: Repository<Task>,
     @InjectRepository(User) private users: Repository<User>,
     @InjectRepository(Customer) private customers: Repository<Customer>,
-    private rt: RealtimeGateway
+    private rt: RealtimeGateway,
+    private archiveStore: TaskArchiveService
   ) {}
 
   async create(dto: CreateTaskDto, createdById: string) {
@@ -208,6 +211,85 @@ export class TasksService {
     this.rt.broadcastToAdmins("task:updated", saved);
     this.rt.broadcastAll("tasks:update", saved);
     return saved;
+  }
+
+  /**
+   * Archiva una tarea COMPLETADA: primero la copia integra al archivo de texto
+   * plano (que vive fuera de la base de datos) y solo entonces la borra de la
+   * tabla. Si la escritura del archivo falla, la tarea NO se borra.
+   */
+  async archive(id: string, actorId: string) {
+    const task = await this.tasks.findOne({ where: { id } });
+    if (!task) throw new NotFoundException("Tarea no encontrada");
+    if (task.status !== "COMPLETADA") {
+      throw new BadRequestException(
+        "Solo se pueden archivar tareas completadas"
+      );
+    }
+    if (await this.archiveStore.isArchived(id)) {
+      throw new BadRequestException("La tarea ya estaba archivada");
+    }
+
+    const actor = await this.users.findOne({ where: { id: actorId } });
+    const customer = task.customer as any;
+
+    const record: ArchivedTask = {
+      id: task.id,
+      titulo: task.title,
+      descripcion: task.description || null,
+      estado: task.status,
+      telefonoContacto: task.telefonoContacto || null,
+      cliente: customer
+        ? {
+            id: customer.id ?? null,
+            nombre: customer.nombreCompleto ?? customer.name ?? null,
+            direccion: customer.direccion ?? customer.address ?? null,
+            telefono: customer.telefono ?? customer.phone ?? null,
+            ipAsignada: customer.ipAsignada ?? null,
+          }
+        : null,
+      trabajador: task.assignedTo
+        ? {
+            id: task.assignedTo.id,
+            nombre: (task.assignedTo as any).name ?? null,
+            email: (task.assignedTo as any).email ?? null,
+          }
+        : null,
+      creadaPor: task.createdBy
+        ? {
+            id: task.createdBy.id,
+            nombre: (task.createdBy as any).name ?? null,
+            email: (task.createdBy as any).email ?? null,
+          }
+        : null,
+      creadaEn: task.createdAt ? new Date(task.createdAt).toISOString() : null,
+      completadaEn: task.completedAt
+        ? new Date(task.completedAt).toISOString()
+        : null,
+      comentarioFinal: task.comentarioFinal ?? null,
+      motivoObjecion: task.motivoObjecion ?? null,
+      evidenciaUrl: task.proofUrl ?? null,
+      archivadaEn: new Date().toISOString(),
+      archivadaPor: actor
+        ? {
+            id: actor.id,
+            nombre: (actor as any).name ?? null,
+            email: (actor as any).email ?? null,
+          }
+        : null,
+    };
+
+    await this.archiveStore.append(record);
+    await this.tasks.delete(id);
+
+    if (task.assignedTo?.id)
+      this.rt.emitToUser(task.assignedTo.id, "task:updated", {
+        id,
+        deleted: true,
+      });
+    this.rt.broadcastToAdmins("task:updated", { id, deleted: true });
+    this.rt.broadcastAll("tasks:update", { id, deleted: true });
+    return { id, archived: true };
   }
 
   async remove(id: string) {

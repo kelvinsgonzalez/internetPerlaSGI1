@@ -1,4 +1,5 @@
-import { IsBoolean, IsEmail, IsEnum, IsNumber, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsEnum, IsNumber, IsOptional, IsString, Matches } from 'class-validator';
+import { PASSWORD_REGEX, PASSWORD_RULE_MESSAGE } from '../../common/security';
 import { Role } from './user.entity';
 
 export class UpdateLocationDto {
@@ -13,7 +14,7 @@ export class RegisterDto {
   @IsEmail()
   email: string;
   @IsString()
-  @MinLength(6)
+  @Matches(PASSWORD_REGEX, { message: PASSWORD_RULE_MESSAGE })
   password: string;
   @IsOptional()
   @IsString()
@@ -34,7 +35,7 @@ export class UpdateUserDto {
   email?: string;
   @IsOptional()
   @IsString()
-  @MinLength(6)
+  @Matches(PASSWORD_REGEX, { message: PASSWORD_RULE_MESSAGE })
   password?: string;
   @IsOptional()
   @IsEnum(Role)
@@ -47,3 +48,14 @@ export class UpdateUserDto {
   isBlocked?: boolean;
 }
 
+
+/** Cambio de contraseña propio: exige la actual para que un token robado no
+ *  baste para secuestrar la cuenta. */
+export class ChangePasswordDto {
+  @IsString()
+  currentPassword: string;
+
+  @IsString()
+  @Matches(PASSWORD_REGEX, { message: PASSWORD_RULE_MESSAGE })
+  newPassword: string;
+}

@@ -115,6 +115,12 @@ export class FinanceController {
   summaries(@Query() q: DateRangeDto) {
     return this.service.listDailySummaries(q.from, q.to, q.userId);
   }
+  // Agregado diario desde movimientos (incluye días sin cierre)
+  @Get("cash-daily")
+  @Roles("ADMIN")
+  cashDaily(@Query() q: DateRangeDto) {
+    return this.service.listDailyAggregates(q.from, q.to);
+  }
   @Post("cash-summaries/close-day")
   @Roles("ADMIN")
   closeDay(@Body() dto: CloseDayDto, @Req() req: any) {

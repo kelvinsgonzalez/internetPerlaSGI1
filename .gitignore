@@ -36,3 +36,6 @@ Thumbs.db
 
 # Archivos subidos en runtime
 apps/backend/uploads/
+
+# Archivo de Tareas generado en runtime (log de texto plano)
+apps/backend/data/

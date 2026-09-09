@@ -89,16 +89,24 @@ services:
       # Migraciones al arrancar. Alternativa: dejarlo en false y ejecutar
       # `npm run migration:run:prod` manualmente dentro del contenedor.
       DB_MIGRATIONS_RUN: ${DB_MIGRATIONS_RUN:-true}
-      JWT_SECRET: ${JWT_SECRET}
+      JWT_SECRET: ${JWT_SECRET:?define JWT_SECRET en .env (openssl rand -hex 32)}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      # Identidad del administrador y cuentas retiradas: nunca en el código.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      LEGACY_ADMIN_EMAIL: ${LEGACY_ADMIN_EMAIL:-}
+      RETIRED_EMAILS: ${RETIRED_EMAILS:-}
       BUSINESS_TZ: ${BUSINESS_TZ:-America/Guatemala}
       AUTO_CLOSE_ENABLED: ${AUTO_CLOSE_ENABLED:-false}
       CORS_ORIGINS: https://${FRONTEND_DOMAIN}
+      # Archivo de Tareas: fichero de texto plano en su propio volumen, para
+      # que el historial sobreviva a rebuilds y a recreaciones de la base.
+      TASK_ARCHIVE_DIR: /app/data
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - uploads:/app/uploads
+      - task_archive:/app/data
     networks:
       - internal
       - web
@@ -159,4 +167,5 @@ networks:
 volumes:
   ip_db_data:
   uploads:
+  task_archive:
   traefik_letsencrypt:

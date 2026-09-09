@@ -20,6 +20,7 @@ import MessagesPage from "./pages/Messages";
 import MyTasks from "./pages/MyTasks";
 import Profile from "./pages/Profile";
 import RegisterPage from "./pages/RegisterPage";
+import TaskArchive from "./pages/TaskArchive";
 import TasksAdmin from "./pages/TasksAdmin";
 import Workers from "./pages/Workers";
 import { WorkersMap } from "./pages/WorkersMap";
@@ -267,6 +268,16 @@ export const router = createBrowserRouter(
             <Protected role="ADMIN">
               <AdminShell>
                 <TasksAdmin />
+              </AdminShell>
+            </Protected>
+          ),
+        },
+        {
+          path: "archivo-tareas",
+          element: (
+            <Protected role="ADMIN">
+              <AdminShell>
+                <TaskArchive />
               </AdminShell>
             </Protected>
           ),
