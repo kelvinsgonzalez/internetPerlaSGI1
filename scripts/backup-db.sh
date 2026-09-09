@@ -24,7 +24,7 @@ STAMP=$(date +%Y%m%d-%H%M%S)
 OUT="$BACKUP_DIR/internetperla-$STAMP.sql.gz"
 
 # pg_dump se ejecuta dentro del contenedor: la base no expone puertos al host.
-$COMPOSE exec -T db pg_dump -U "$DB_USERNAME" -d "$DB_DATABASE" --clean --if-exists \
+$COMPOSE exec -T db-crm pg_dump -U "$DB_USERNAME" -d "$DB_DATABASE" --clean --if-exists \
   | gzip -9 > "$OUT"
 
 # Un dump vacío o truncado es peor que no tener backup: verifícalo.

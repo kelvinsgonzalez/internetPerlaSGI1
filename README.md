@@ -150,7 +150,7 @@ cp .env.prod.example .env && nano .env && chmod 600 .env
 bash scripts/deploy.sh
 
 # 4) Sólo la primera vez: crea el administrador
-docker compose -f docker-compose.prod.yml exec backend npm run seed:prod
+docker compose -f docker-compose.prod.yml exec backend-crm npm run seed:prod
 ```
 
 Operación:
@@ -160,7 +160,7 @@ Operación:
 | Actualizar | `bash scripts/deploy.sh` |
 | Backup (base + uploads) | `bash scripts/backup-db.sh` |
 | Restaurar | `bash scripts/restore-db.sh <archivo.sql.gz>` |
-| Migraciones a mano | `docker compose -f docker-compose.prod.yml exec backend npm run migration:run:prod` |
+| Migraciones a mano | `docker compose -f docker-compose.prod.yml exec backend-crm npm run migration:run:prod` |
 
 ## Despliegue histórico (Render + Netlify)
 

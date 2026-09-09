@@ -155,7 +155,7 @@ Con `DB_MIGRATIONS_RUN=true` (el valor por defecto) la migración corre sola al
 arrancar el backend. Para forzarla a mano:
 
 ```bash
-docker compose -f docker-compose.prod.yml exec backend npm run migration:run:prod
+docker compose -f docker-compose.prod.yml exec backend-crm npm run migration:run:prod
 ```
 
 `MigrateLegacyAdminEmail` traslada la cuenta conservando id, rol e historial, y
@@ -173,7 +173,7 @@ En el `.env`, define `ADMIN_EMAIL` y deja `SEED_ADMIN_PASSWORD` **vacía**; el
 seed generará una contraseña aleatoria y la mostrará una única vez:
 
 ```bash
-docker compose -f docker-compose.prod.yml exec backend npm run seed:prod
+docker compose -f docker-compose.prod.yml exec backend-crm npm run seed:prod
 ```
 
 Anótala, entra y cámbiala de inmediato desde *Ajustes de Administración →
@@ -210,8 +210,8 @@ Con `DB_MIGRATIONS_RUN=true` (el valor por defecto en `.env.prod.example`) se
 aplican solas al arrancar el backend. Para hacerlo a mano:
 
 ```bash
-docker compose -f docker-compose.prod.yml exec backend npm run migration:show:prod
-docker compose -f docker-compose.prod.yml exec backend npm run migration:run:prod
+docker compose -f docker-compose.prod.yml exec backend-crm npm run migration:show:prod
+docker compose -f docker-compose.prod.yml exec backend-crm npm run migration:run:prod
 ```
 
 > Dentro del contenedor de producción **no existe `ts-node`** (se instala con
@@ -251,8 +251,9 @@ bash scripts/restore-db.sh ~/backups/internetperla/internetperla-20260903-030000
 
 ```bash
 docker compose -f docker-compose.prod.yml ps
-docker compose -f docker-compose.prod.yml logs -f backend
-docker compose -f docker-compose.prod.yml logs -f traefik
+docker compose -f docker-compose.prod.yml logs -f backend-crm
+# Traefik ya no vive en este compose: corre aparte y usa la red externa `web`.
+docker logs -f traefik
 ```
 
 Los logs están limitados a 10 MB × 5 archivos por contenedor, así que no
@@ -261,7 +262,7 @@ llenan el disco.
 ### 5.5 Reiniciar un servicio
 
 ```bash
-docker compose -f docker-compose.prod.yml restart backend
+docker compose -f docker-compose.prod.yml restart backend-crm
 ```
 
 ---
@@ -274,7 +275,7 @@ docker compose -f docker-compose.prod.yml restart backend
 | `too many certificates already issued` | Límite semanal de Let's Encrypt por repetir despliegues fallidos | Esperar, y probar primero con `--certificatesresolvers.le.acme.caserver` de staging |
 | El frontend carga pero el API da error de CORS | `FRONTEND_DOMAIN` en `.env` no coincide con el dominio real | Corregir `.env` y `docker compose ... up -d backend` |
 | El WebSocket no conecta | `VITE_SOCKET_URL` apunta a `http://` en vez de `https://` | Lo genera el compose desde `BACKEND_DOMAIN`; reconstruir el frontend |
-| Cambié una `VITE_*` y no se aplica | Se hornean en el bundle durante el build, no en runtime | `docker compose -f docker-compose.prod.yml build frontend && ... up -d frontend` |
+| Cambié una `VITE_*` y no se aplica | Se hornean en el bundle durante el build, no en runtime | `docker compose -f docker-compose.prod.yml build frontend-crm && ... up -d frontend-crm` |
 | `DB connection refused` al arrancar | El backend arrancó antes que Postgres | Ya hay `depends_on: service_healthy`; revisar `logs db` |
 | El build del frontend muere sin mensaje | Sin memoria (VPS de 4 GB sin swap) | `swapon --show`; si está vacío, correr `vps-bootstrap.sh` otra vez |
 | `permission denied` al usar docker | El usuario acaba de entrar al grupo `docker` | Cerrar sesión y volver a entrar |
