@@ -467,7 +467,7 @@ export default function AdminShell({ children }: PropsWithChildren) {
   const { user, logout } = useAuth();
   const nav = useNavigate();
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const logoSrc = "/perla-logo.svg";
+  const logoSrc = "/crm/perla-logo.svg";
 
   const linkCls = ({ isActive }: any) =>
     `group relative flex items-center gap-3 rounded-xl px-3 py-2 border transition ${
