@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import api, { setAuth } from '../services/api';
+import type { Role } from '../services/roles';
 
-type UserPayload = { sub: string; email: string; role: 'ADMIN'|'USER'; name?: string } | null;
+type UserPayload = { sub: string; email: string; role: Role; name?: string } | null;
 
-type AuthContextType = { user: UserPayload; token?: string; initializing: boolean; login: (e:string,p:string)=>Promise<void>; register:(n:string,e:string,p:string)=>Promise<void>; logout:()=>void };
+type AuthContextType = { user: UserPayload; token?: string; initializing: boolean; login: (e:string,p:string)=>Promise<void>; logout:()=>void };
 
 const AuthContext = createContext<AuthContextType>({} as any);
 
@@ -30,9 +31,8 @@ export const AuthProvider: React.FC<{children:React.ReactNode}> = ({ children })
     setInitializing(false);
   },[]);
   const login = async (email:string,password:string) => { const {data} = await api.post('/auth/login',{email,password}); localStorage.setItem('ip_token',data.access_token); setAuth(data.access_token); setToken(data.access_token); setUser(parseJwt(data.access_token)); };
-  const register = async (name:string,email:string,password:string) => { await api.post('/auth/register',{name,email,password}); await login(email,password); };
   const logout = ()=>{ localStorage.removeItem('ip_token'); setAuth(undefined); setToken(undefined); setUser(null); };
-  const value = useMemo(()=>({user,token,initializing,login,register,logout}),[user,token,initializing]);
+  const value = useMemo(()=>({user,token,initializing,login,logout}),[user,token,initializing]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 

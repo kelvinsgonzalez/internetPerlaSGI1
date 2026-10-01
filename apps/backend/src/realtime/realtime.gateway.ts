@@ -11,8 +11,9 @@ import {
 } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
 import { isOriginAllowed } from "../common/cors";
+import { isManager, Role } from "../modules/users/user.entity";
 
-type JwtPayload = { sub: string; role?: "ADMIN" | "USER"; email?: string };
+type JwtPayload = { sub: string; role?: Role; email?: string };
 
 @Injectable()
 @WebSocketGateway({
@@ -71,7 +72,8 @@ export class RealtimeGateway
       (client.data as any).userId = user.id;
       (client.data as any).role = user.role;
       client.join(`user:${user.id}`);
-      if (user.role === "ADMIN") client.join("role:ADMIN");
+      // SUPERVISOR comparte la sala para recibir mapa, asistencia y tareas en vivo.
+      if (isManager(user.role)) client.join("role:ADMIN");
     } catch {
       client.disconnect(true);
     }

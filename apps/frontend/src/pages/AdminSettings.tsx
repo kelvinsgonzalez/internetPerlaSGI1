@@ -1,31 +1,39 @@
 import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { Shield, User, Search, Lock, Unlock, KeyRound, UserCheck, UserX, Info, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Shield, User, Search, Lock, Unlock, KeyRound, UserCheck, UserX, Info, Eye, EyeOff, Loader2, Pencil, AtSign, X, Check, Wand2 } from 'lucide-react';
 
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import { ROLE_LABEL, type Role } from '../services/roles';
 
 interface WorkerSummary {
   id: string;
   email: string;
   name?: string;
-  role: 'ADMIN' | 'USER';
+  role: Role;
   isBlocked?: boolean;
 }
 
 const glassCard = 'backdrop-blur-xl bg-white/80 shadow-xl shadow-emerald-100/60 border border-white/30';
+
+const inputCls =
+  'w-full rounded-2xl border border-emerald-200/70 bg-white px-4 py-2 text-sm shadow-inner focus:border-emerald-400 focus:outline-none';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const apiError = (err: any, fallback: string) => {
+  const message = err?.response?.data?.message;
+  return Array.isArray(message) ? message[0] : message || fallback;
+};
+
+type AccessForm = { worker: WorkerSummary; email: string; password: string };
 
 // Misma regla que valida el backend en common/security.ts: si cambia allí,
 // cambia aquí (el servidor sigue siendo la autoridad; esto sólo evita el viaje).
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 const PASSWORD_RULE_MESSAGE =
   'La contraseña debe tener al menos 8 caracteres e incluir mayúscula, minúscula, número y símbolo';
-
-const ROLE_LABEL: Record<WorkerSummary['role'], string> = {
-  ADMIN: 'Administrador',
-  USER: 'Colaborador',
-};
 
 /**
  * Contraseña temporal que cumple la política del servidor. Usa
@@ -67,6 +75,20 @@ export default function AdminSettings() {
   const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' });
   const [showPasswords, setShowPasswords] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+
+  // Cambio de correo de la propia cuenta.
+  const [myEmail, setMyEmail] = useState(currentUser?.email ?? '');
+  const [emailForm, setEmailForm] = useState({ email: '', current: '' });
+  const [savingEmail, setSavingEmail] = useState(false);
+
+  // Edición de correo y contraseña de otra cuenta.
+  const [access, setAccess] = useState<AccessForm | null>(null);
+  const [showAccessPassword, setShowAccessPassword] = useState(false);
+  const [savingAccess, setSavingAccess] = useState(false);
+
+  useEffect(() => {
+    setMyEmail(currentUser?.email ?? '');
+  }, [currentUser?.email]);
 
   const loadWorkers = async () => {
     setLoading(true);
@@ -151,20 +173,86 @@ export default function AdminSettings() {
       setPasswordForm({ current: '', next: '', confirm: '' });
       toast.success('Contraseña actualizada. Úsala en tu próximo inicio de sesión.');
     } catch (err: any) {
-      const message = err?.response?.data?.message;
-      toast.error(Array.isArray(message) ? message[0] : message || 'No se pudo cambiar la contraseña');
+      toast.error(apiError(err, 'No se pudo cambiar la contraseña'));
     } finally {
       setSavingPassword(false);
     }
   };
 
-  const resetPassword = async (worker: WorkerSummary) => {
-    const tempPassword = generateTempPassword();
+  const openAccess = (worker: WorkerSummary) => {
+    setShowAccessPassword(false);
+    setAccess({ worker, email: worker.email, password: '' });
+  };
+
+  const saveAccess = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!access) return;
+    const email = access.email.trim().toLowerCase();
+    const payload: { email?: string; password?: string } = {};
+    if (email !== access.worker.email) {
+      if (!EMAIL_REGEX.test(email)) {
+        toast.error('Escribe un correo válido');
+        return;
+      }
+      payload.email = email;
+    }
+    if (access.password) {
+      if (!PASSWORD_REGEX.test(access.password)) {
+        toast.error(PASSWORD_RULE_MESSAGE);
+        return;
+      }
+      payload.password = access.password;
+    }
+    if (!payload.email && !payload.password) {
+      toast.info('No hay cambios que guardar');
+      return;
+    }
+    setSavingAccess(true);
     try {
-      await api.patch(`/users/${worker.id}`, { password: tempPassword });
-      toast.success(`Contraseña temporal: ${tempPassword}`, { duration: 10000 });
-    } catch (err) {
-      toast.error('No se pudo restablecer la contraseña');
+      const { data } = await api.patch(`/users/${access.worker.id}`, payload);
+      const updated = (data?.value || data) as WorkerSummary | undefined;
+      setWorkers((prev) =>
+        prev.map((w) => (w.id === access.worker.id ? { ...w, email: updated?.email ?? email } : w))
+      );
+      if (payload.password) {
+        // Se muestra una sola vez: el servidor sólo guarda el hash.
+        toast.success(`Acceso actualizado. Nueva contraseña: ${payload.password}`, { duration: 15000 });
+      } else {
+        toast.success('Correo actualizado');
+      }
+      setAccess(null);
+    } catch (err: any) {
+      toast.error(apiError(err, 'No se pudo actualizar el acceso'));
+    } finally {
+      setSavingAccess(false);
+    }
+  };
+
+  const changeOwnEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const email = emailForm.email.trim().toLowerCase();
+    if (!EMAIL_REGEX.test(email)) {
+      toast.error('Escribe un correo válido');
+      return;
+    }
+    if (email === myEmail.toLowerCase()) {
+      toast.error('El nuevo correo es igual al actual');
+      return;
+    }
+    if (!emailForm.current) {
+      toast.error('Escribe tu contraseña actual para confirmar');
+      return;
+    }
+    setSavingEmail(true);
+    try {
+      const { data } = await api.patch('/users/me/email', { email, currentPassword: emailForm.current });
+      setMyEmail(data?.email ?? email);
+      setEmailForm({ email: '', current: '' });
+      toast.success('Correo actualizado. Úsalo en tu próximo inicio de sesión.');
+    } catch (err: any) {
+      toast.error(apiError(err, 'No se pudo cambiar el correo'));
+    } finally {
+      setSavingEmail(false);
     }
   };
 
@@ -237,19 +325,28 @@ export default function AdminSettings() {
                       </span>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 shrink-0">
-                      <button onClick={() => toggleBlock(worker)} className={`p-2 rounded-full transition ${worker.isBlocked ? 'text-emerald-600 bg-emerald-100/60 hover:bg-emerald-100' : 'text-red-600 bg-red-100/60 hover:bg-red-100'}`}>
+                      <button
+                        onClick={() => toggleBlock(worker)}
+                        title={worker.isBlocked ? 'Restaurar acceso' : 'Bloquear acceso'}
+                        className={`p-2 rounded-full transition ${worker.isBlocked ? 'text-emerald-600 bg-emerald-100/60 hover:bg-emerald-100' : 'text-red-600 bg-red-100/60 hover:bg-red-100'}`}>
                         {worker.isBlocked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
                       </button>
-                      <button onClick={() => resetPassword(worker)} className="p-2 rounded-full text-slate-600 bg-slate-100/60 hover:bg-slate-200 transition">
-                        <KeyRound className="h-4 w-4" />
+                      <button
+                        onClick={() => openAccess(worker)}
+                        title="Cambiar correo y contraseña"
+                        aria-label={`Cambiar correo y contraseña de ${worker.name || worker.email}`}
+                        className="p-2 rounded-full text-slate-600 bg-slate-100/60 hover:bg-slate-200 transition"
+                      >
+                        <Pencil className="h-4 w-4" />
                       </button>
                       <select
                         className="w-36 appearance-none rounded-full border border-emerald-200/70 bg-white px-3 py-2 text-xs font-semibold text-emerald-700 shadow-inner focus:border-emerald-400 focus:outline-none"
                         value={worker.role}
                         onChange={(e) => updateRole(worker, e.target.value as WorkerSummary['role'])}
                       >
-                        <option value="USER">Colaborador</option>
-                        <option value="ADMIN">Administrador</option>
+                        <option value="USER">{ROLE_LABEL.USER}</option>
+                        <option value="SUPERVISOR">{ROLE_LABEL.SUPERVISOR}</option>
+                        <option value="ADMIN">{ROLE_LABEL.ADMIN}</option>
                       </select>
                     </div>
                   </div>
@@ -270,14 +367,57 @@ export default function AdminSettings() {
               <h2 className="text-xl font-bold text-slate-900">Mi cuenta</h2>
             </div>
             <p className="text-sm text-slate-500">
-              {currentUser?.email}
+              {myEmail}
               {currentUser?.role === 'ADMIN' ? ' · Administrador principal' : ''}
             </p>
             <p className="mt-3 text-sm text-slate-600">
-              Cambia aquí tu propia contraseña. Nadie más puede hacerlo por ti.
+              Cambia aquí tu propio correo y contraseña. Ambos piden tu contraseña actual.
             </p>
 
-            <form className="mt-4 space-y-3" onSubmit={changeOwnPassword}>
+            <form className="mt-4 space-y-3" onSubmit={changeOwnEmail}>
+              <h3 className="text-sm font-semibold text-slate-700">Correo de acceso</h3>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500" htmlFor="new-email">
+                  Nuevo correo
+                </label>
+                <input
+                  id="new-email"
+                  type="email"
+                  autoComplete="email"
+                  className={inputCls}
+                  value={emailForm.email}
+                  onChange={(e) => setEmailForm((f) => ({ ...f, email: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500" htmlFor="email-current-password">
+                  Contraseña actual
+                </label>
+                <input
+                  id="email-current-password"
+                  type="password"
+                  autoComplete="current-password"
+                  className={inputCls}
+                  value={emailForm.current}
+                  onChange={(e) => setEmailForm((f) => ({ ...f, current: e.target.value }))}
+                />
+              </div>
+              <div className="flex justify-end pt-1">
+                <button
+                  type="submit"
+                  disabled={savingEmail}
+                  className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {savingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <AtSign className="h-4 w-4" />}
+                  {savingEmail ? 'Guardando...' : 'Actualizar correo'}
+                </button>
+              </div>
+            </form>
+
+            <div className="my-5 border-t border-emerald-100" />
+            <h3 className="text-sm font-semibold text-slate-700">Contraseña</h3>
+
+            <form className="mt-3 space-y-3" onSubmit={changeOwnPassword}>
               <div>
                 <label className="mb-1 block text-xs font-semibold text-slate-500" htmlFor="current-password">
                   Contraseña actual
@@ -352,13 +492,114 @@ export default function AdminSettings() {
             </div>
             <ul className="space-y-3 text-sm text-slate-600">
               <li className="flex items-start gap-3"><UserX className="h-4 w-4 mt-0.5 text-sky-500 shrink-0" /><span>Bloquea las cuentas inactivas para evitar accesos no autorizados.</span></li>
-              <li className="flex items-start gap-3"><KeyRound className="h-4 w-4 mt-0.5 text-sky-500 shrink-0" /><span>Genera contraseñas temporales y comunícalas por un medio seguro.</span></li>
+              <li className="flex items-start gap-3"><KeyRound className="h-4 w-4 mt-0.5 text-sky-500 shrink-0" /><span>Si cambias el correo o la contraseña de alguien, comunícaselo por un medio seguro. Su sesión actual se cierra al cambiar la contraseña.</span></li>
               <li className="flex items-start gap-3"><UserCheck className="h-4 w-4 mt-0.5 text-sky-500 shrink-0" /><span>Promueve a administrador solo a personal de confianza y revoca el rol cuando sea necesario.</span></li>
             </ul>
           </motion.section>
           </div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {access && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur"
+            onClick={() => !savingAccess && setAccess(null)}
+          >
+            <motion.form
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="access-title"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className={`${glassCard} w-full max-w-md rounded-3xl p-6`}
+              onClick={(e) => e.stopPropagation()}
+              onSubmit={saveAccess}
+            >
+              <h3 id="access-title" className="text-lg font-semibold text-slate-900">
+                Correo y contraseña
+              </h3>
+              <p className="mb-4 text-sm text-slate-500">{access.worker.name || access.worker.email}</p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-500" htmlFor="access-email">
+                    Correo
+                  </label>
+                  <input
+                    id="access-email"
+                    type="email"
+                    autoComplete="off"
+                    className={inputCls}
+                    value={access.email}
+                    onChange={(e) => setAccess({ ...access, email: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-500" htmlFor="access-password">
+                    Nueva contraseña <span className="font-normal text-slate-400">(déjala vacía para no cambiarla)</span>
+                  </label>
+                  <p className="mb-1 text-[11px] leading-snug text-slate-400">{PASSWORD_RULE_MESSAGE}.</p>
+                  <div className="flex gap-2">
+                    <input
+                      id="access-password"
+                      type={showAccessPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      className={inputCls}
+                      value={access.password}
+                      onChange={(e) => setAccess({ ...access, password: e.target.value })}
+                    />
+                    <button
+                      type="button"
+                      title={showAccessPassword ? 'Ocultar' : 'Mostrar'}
+                      aria-label={showAccessPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      onClick={() => setShowAccessPassword((v) => !v)}
+                      className="shrink-0 rounded-full bg-slate-100/80 p-2 text-slate-600 transition hover:bg-slate-200"
+                    >
+                      {showAccessPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAccess({ ...access, password: generateTempPassword() });
+                      setShowAccessPassword(true);
+                    }}
+                    className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+                  >
+                    <Wand2 className="h-3.5 w-3.5" />
+                    Generar contraseña temporal
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setAccess(null)}
+                  disabled={savingAccess}
+                  className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                >
+                  <X className="h-4 w-4" />
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingAccess}
+                  className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {savingAccess ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                  {savingAccess ? 'Guardando...' : 'Guardar'}
+                </button>
+              </div>
+            </motion.form>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

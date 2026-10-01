@@ -5,6 +5,7 @@ import { useSocket } from "../hooks/useSocket";
 import api from "../services/api";
 import { getCustomers } from "../services/customers";
 import { archiveTask } from "../services/taskArchive";
+import type { Role } from "../services/roles";
 import {
   createTask,
   deleteTask,
@@ -18,7 +19,7 @@ type User = {
   id: string;
   email: string;
   name?: string;
-  role: "ADMIN" | "USER";
+  role: Role;
 };
 type Customer = {
   id: string;

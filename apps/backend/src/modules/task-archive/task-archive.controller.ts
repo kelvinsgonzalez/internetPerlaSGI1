@@ -3,10 +3,11 @@ import { AuthGuard } from "@nestjs/passport";
 import type { Response } from "express";
 import { Roles } from "../auth/roles.decorator";
 import { RolesGuard } from "../auth/roles.guard";
+import { MANAGEMENT_ROLES } from "../users/user.entity";
 import { TaskArchiveService } from "./task-archive.service";
 
 @UseGuards(AuthGuard("jwt"), RolesGuard)
-@Roles("ADMIN")
+@Roles(...MANAGEMENT_ROLES)
 @Controller("task-archive")
 export class TaskArchiveController {
   constructor(private readonly archive: TaskArchiveService) {}

@@ -7,8 +7,8 @@ Este documento resume la arquitectura, módulos, modelos de datos, endpoints y f
 - Monorepo con `apps/backend` (NestJS + TypeORM + PostgreSQL + JWT) y `apps/frontend` (React + Vite + Tailwind).
 - Orquestación con Docker: `db` (Postgres 15), `backend` (puerto 3000), `frontend` (puerto 5173 expuesto como 3001 en compose).
 - Prefijo API: `/api/v1`.
-- Auth JWT con roles `ADMIN` y `USER`.
-- Realtime con Socket.IO autenticado por JWT (rooms por usuario y sala `role:ADMIN`).
+- Auth JWT con roles `ADMIN`, `SUPERVISOR` y `USER`.
+- Realtime con Socket.IO autenticado por JWT (rooms por usuario y sala `role:ADMIN`, a la que también se une `SUPERVISOR`).
 
 ## Backend (NestJS)
 
@@ -16,7 +16,7 @@ Este documento resume la arquitectura, módulos, modelos de datos, endpoints y f
   - CORS por `CORS_ORIGINS` (helper compartido en `src/common/cors.ts`, usado también por el gateway de Socket.IO), `app.setGlobalPrefix('api/v1')`, ValidationPipe global.
 - `AppModule`: carga `ConfigModule`, `ServeStaticModule` para `/uploads`, y `TypeOrmModule.forRootAsync` con `synchronize` configurable por `DB_SYNC`.
 - Módulos principales:
-  - `auth`: login/register, JWT strategy. Login auto-registra asistencia IN para usuarios normales si no existe en el día.
+  - `auth`: login y JWT strategy (sin registro público). Login auto-registra asistencia IN para usuarios normales si no existe en el día.
   - `users`: entidad `User { id, email, passwordHash, role, name }`.
   - `customers`: CRUD simple `Customer { id, name, email, phone? }`.
   - `attendance`: `AttendanceRecord { id, name, tipo(IN|OUT), timestamp, note? }`. El nombre lo pone el servidor desde el JWT, nunca el cliente.
@@ -50,7 +50,7 @@ Corte de caja (disponible para ADMIN y USER):
 
 ### Autenticación
 
-- `POST /auth/register` -> crea usuario (por defecto USER, el seed/primer usuario puede ser ADMIN).
+- Las cuentas las crea un ADMIN con `POST /users`; el ADMIN inicial sale del seed.
 - `POST /auth/login` -> devuelve `{ access_token, user }` con payload `{ sub, email, role, name }`.
 - Estrategia JWT en header `Authorization: Bearer <token>`.
 
@@ -64,12 +64,12 @@ Corte de caja (disponible para ADMIN y USER):
 - Router en `pages/App.tsx` con `Protected` guard y switching por rol para panel Admin vs Dashboard usuario.
 - Auth Context `hooks/useAuth.tsx`:
   - Persiste `ip_token` en localStorage; decodifica payload para `user`.
-  - `login`/`register` usan `services/api.ts`; inyecta header Authorization.
+  - `login` usa `services/api.ts`; inyecta header Authorization.
 - API client `services/api.ts`:
   - baseURL = `VITE_API_URL` o fallback `http(s)://<host>:3000/api/v1`.
   - `getApiOrigin()` para Socket.IO origin.
 - Socket Hook `hooks/useSocket.ts`: conecta a `io(getApiOrigin(), { auth: { token }})` cuando hay sesión.
-- Páginas principales: Login, Register, Dashboard, AdminPanel, Customers, Inventory, Attendance, Finance, Messages, TasksAdmin, MyTasks, Profile, Workers.
+- Páginas principales: Login, Dashboard, AdminPanel, Customers, Inventory, Attendance, Finance, Messages, TasksAdmin, MyTasks, Profile, Workers.
 - Componentes reutilizables: `components/ip/{LoadingState, ErrorState, EmptyState}` y `components/ui/*`.
 
 ## Docker Compose
@@ -83,7 +83,7 @@ Corte de caja (disponible para ADMIN y USER):
 - Prefijo de rutas en backend `/api/v1`; en frontend se usa `api.get('/...')` sin volver a anteponer el prefijo.
 - Validación con class-validator en DTOs; pipes con `whitelist` y `transform` activos.
 - Las columnas `decimal` usan `decimalTransformer` (`src/common/decimal.transformer.ts`), así que el API entrega `number` y no `string`.
-- Roles: ADMIN controla módulos sensibles (inventario, finanzas, usuarios). USER usa dashboard y mensajería.
+- Roles: ADMIN controla todo, incluidos usuarios, clientes e inventario. SUPERVISOR gestiona Asistencia, Finanzas, Tareas, Mapa y Mensajes, con lectura de usuarios pero sin crearlos ni modificarlos. USER usa dashboard y mensajería.
 
 ## Flujo de Autenticación y Realtime
 
@@ -95,6 +95,7 @@ Corte de caja (disponible para ADMIN y USER):
 
 - Viven en `src/migrations`, registradas en `AppModule` y en `src/data-source.ts` (para la CLI).
 - No corren solas: `DB_MIGRATIONS_RUN=true` o `npm run migration:run`.
+- **Historial de cobros**: base aparte (`internetperla_historial`, variables `HIST_DB_*`). La conexión la maneja `modules/historial/historial.database.ts` fuera de `TypeOrmModule`, para que un fallo de esa base no impida arrancar el CRM. Al iniciar crea la base si falta y aplica `src/migrations-historial`. CLI: `src/data-source-historial.ts`. Datos guardados solo como texto; SUPERVISOR consulta y ADMIN escribe.
 
 ## Próximos pasos sugeridos
 

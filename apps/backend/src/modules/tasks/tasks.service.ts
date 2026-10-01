@@ -10,7 +10,7 @@ import { RealtimeGateway } from "../../realtime/realtime.gateway";
 import { Customer } from "../customers/customer.entity";
 import { TaskArchiveService } from "../task-archive/task-archive.service";
 import { ArchivedTask } from "../task-archive/task-archive.types";
-import { User } from "../users/user.entity";
+import { Role, User } from "../users/user.entity";
 import { CreateTaskDto, UpdateTaskDto } from "./dto";
 import { Task } from "./task.entity";
 
@@ -119,7 +119,7 @@ export class TasksService {
 
   async update(
     id: string,
-    actor: { id: string; role: "ADMIN" | "USER" },
+    actor: { id: string; role: Role },
     dto: UpdateTaskDto
   ) {
     const task = await this.tasks.findOne({ where: { id } });

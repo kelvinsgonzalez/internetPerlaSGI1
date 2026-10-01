@@ -1,10 +1,10 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards, Req } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { ChangePasswordDto, CreateUserDto, UpdateUserDto, UpdateLocationDto } from './dto';
+import { ChangeEmailDto, ChangePasswordDto, CreateUserDto, UpdateUserDto, UpdateLocationDto } from './dto';
 import { AuthGuard } from '@nestjs/passport';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
-import { Role } from './user.entity';
+import { MANAGEMENT_ROLES, Role } from './user.entity';
 import { Request } from 'express';
 
 @Controller('users')
@@ -25,16 +25,22 @@ export class UsersController {
     return this.service.changeOwnPassword(req.user.userId, dto.currentPassword, dto.newPassword);
   }
 
+  // Igual que la contraseña: cada quien cambia SU correo y confirma con la actual.
+  @Patch('me/email')
+  changeOwnEmail(@Body() dto: ChangeEmailDto, @Req() req: Request & { user: { userId: string } }) {
+    return this.service.changeOwnEmail(req.user.userId, dto.currentPassword, dto.email);
+  }
+
   @Get()
-  @Roles(Role.ADMIN)
+  @Roles(...MANAGEMENT_ROLES)
   findAll() { return this.service.findAll(); }
 
   @Get('with-location')
-  @Roles(Role.ADMIN)
+  @Roles(...MANAGEMENT_ROLES)
   findAllWithLocation() { return this.service.findAllWithLocation(); }
 
   @Get(':id')
-  @Roles(Role.ADMIN)
+  @Roles(...MANAGEMENT_ROLES)
   findOne(@Param('id') id: string) { return this.service.findOne(id); }
 
   @Post()

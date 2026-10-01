@@ -71,7 +71,7 @@ api.interceptors.response.use(
     const status = error?.response?.status;
     const url: string = error?.config?.url || "";
     // Un 401 en el propio login es "credenciales incorrectas", no sesión caducada.
-    const isAuthCall = url.includes("/auth/login") || url.includes("/auth/register");
+    const isAuthCall = url.includes("/auth/login");
 
     if (status === 401 && !isAuthCall) {
       try {

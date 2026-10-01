@@ -1,6 +1,6 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Role, User } from './user.entity';
-import { CreateUserDto, RegisterDto, UpdateUserDto } from './dto';
+import { CreateUserDto, UpdateUserDto } from './dto';
 import * as bcrypt from 'bcryptjs';
 import { UsersRepository } from '../../repositories/users.repository';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
@@ -30,6 +30,35 @@ export class UsersService {
     return email.trim().toLowerCase();
   }
 
+  /** El índice único respondería con un 500 genérico; mejor avisar antes. */
+  private async assertEmailAvailable(email: string, ownerId?: string) {
+    const existing = await this.repo.findByEmail(email);
+    if (existing && existing.id !== ownerId) {
+      throw new ConflictException('Ese correo ya está en uso por otra cuenta');
+    }
+  }
+
+  /** Verifica la contraseña actual con freno contra fuerza bruta. */
+  private async verifyCurrentPassword(id: string, currentPassword: string) {
+    // Sin freno, un token robado permitiría adivinar la contraseña actual a
+    // fuerza bruta contra estos mismos endpoints.
+    const throttleKey = `password:${id}`;
+    this.bruteForce.assertAllowed(throttleKey, MAX_PASSWORD_ATTEMPTS);
+
+    const user = await this.repo.findByIdWithPassword(id);
+    if (!user) throw new NotFoundException('User not found');
+
+    const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!ok) {
+      this.bruteForce.registerFailure(throttleKey, MAX_PASSWORD_ATTEMPTS);
+      // 400 y no 401: el interceptor del frontend cierra la sesión ante cualquier
+      // 401, y aquí el token es válido; lo que falla es la contraseña escrita.
+      throw new BadRequestException('La contraseña actual no es correcta');
+    }
+    this.bruteForce.reset(throttleKey);
+    return user;
+  }
+
   findAll() { return this.repo.findAll(); }
   async findOne(id: string) {
     const u = await this.repo.findById(id);
@@ -38,16 +67,9 @@ export class UsersService {
   }
   findByEmail(email: string) { return this.repo.findByEmail(email); }
 
-  async register(dto: RegisterDto) {
-    this.assertUsableEmail(dto.email);
-    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
-    const count = await this.repo.count();
-    const u: Partial<User> = { email: this.normalizeEmail(dto.email), passwordHash, name: dto.name, role: count === 0 ? 'ADMIN' as any : undefined, isBlocked: false };
-    return this.repo.save(u);
-  }
-
   async create(dto: CreateUserDto) {
     this.assertUsableEmail(dto.email);
+    await this.assertEmailAvailable(this.normalizeEmail(dto.email));
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
     const u: Partial<User> = { email: this.normalizeEmail(dto.email), passwordHash, role: dto.role, name: dto.name, isBlocked: dto.isBlocked ?? false };
     return this.repo.save(u);
@@ -78,7 +100,11 @@ export class UsersService {
       u.role === Role.ADMIN && ((dto.role && dto.role !== Role.ADMIN) || dto.isBlocked === true);
     if (losesAdmin) await this.assertNotLastAdmin();
 
-    if (dto.email) u.email = this.normalizeEmail(dto.email);
+    if (dto.email) {
+      const email = this.normalizeEmail(dto.email);
+      if (email !== u.email) await this.assertEmailAvailable(email, u.id);
+      u.email = email;
+    }
     if (dto.name) u.name = dto.name;
     if (dto.role) u.role = dto.role;
     if (dto.password) {
@@ -98,21 +124,7 @@ export class UsersService {
 
   /** El propio usuario (incluido el admin principal) cambia su contraseña. */
   async changeOwnPassword(id: string, currentPassword: string, newPassword: string) {
-    // Sin freno, un token robado permitiría adivinar la contraseña actual a
-    // fuerza bruta contra este mismo endpoint.
-    const throttleKey = `password:${id}`;
-    this.bruteForce.assertAllowed(throttleKey, MAX_PASSWORD_ATTEMPTS);
-
-    const user = await this.repo.findByIdWithPassword(id);
-    if (!user) throw new NotFoundException('User not found');
-
-    const ok = await bcrypt.compare(currentPassword, user.passwordHash);
-    if (!ok) {
-      this.bruteForce.registerFailure(throttleKey, MAX_PASSWORD_ATTEMPTS);
-      // 400 y no 401: el interceptor del frontend cierra la sesión ante cualquier
-      // 401, y aquí el token es válido; lo que falla es la contraseña escrita.
-      throw new BadRequestException('La contraseña actual no es correcta');
-    }
+    const user = await this.verifyCurrentPassword(id, currentPassword);
     if (await bcrypt.compare(newPassword, user.passwordHash)) {
       throw new BadRequestException('La nueva contraseña debe ser distinta de la actual');
     }
@@ -122,8 +134,21 @@ export class UsersService {
     // robado, cambiar la contraseña lo expulsa de verdad.
     user.passwordChangedAt = new Date();
     await this.repo.save(user);
-    this.bruteForce.reset(throttleKey);
     return { success: true };
+  }
+
+  /** El propio usuario cambia su correo de acceso. */
+  async changeOwnEmail(id: string, currentPassword: string, newEmail: string) {
+    this.assertUsableEmail(newEmail);
+    const user = await this.verifyCurrentPassword(id, currentPassword);
+    const email = this.normalizeEmail(newEmail);
+    if (email === user.email) {
+      throw new BadRequestException('El nuevo correo es igual al actual');
+    }
+    await this.assertEmailAvailable(email, id);
+    user.email = email;
+    const saved = await this.repo.save(user);
+    return { id: saved.id, email: saved.email };
   }
 
   async remove(id: string, actorId?: string) {

@@ -5,15 +5,18 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { join } from "path";
 import { SecurityModule } from "./common/security.module";
 import { HealthController } from "./health.controller";
+import { AuditModule } from "./modules/audit/audit.module";
 import { AttendanceModule } from "./modules/attendance/attendance.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { CustomersModule } from "./modules/customers/customers.module";
 import { FinanceModule } from "./modules/finance/finance.module";
+import { HistorialModule } from "./modules/historial/historial.module";
 import { InventoryModule } from "./modules/inventory/inventory.module";
 import { MessagesModule } from "./modules/messages/messages.module";
 import { TaskArchiveModule } from "./modules/task-archive/task-archive.module";
 import { TasksModule } from "./modules/tasks/tasks.module";
 import { UsersModule } from "./modules/users/users.module";
+import { ReleasesModule } from "./modules/releases/releases.module";
 import { RepositoriesModule } from "./repositories/repositories.module";
 
 @Module({
@@ -76,6 +79,9 @@ import { RepositoriesModule } from "./repositories/repositories.module";
     MessagesModule,
     TasksModule,
     TaskArchiveModule,
+    HistorialModule,
+    AuditModule,
+    ReleasesModule,
   ],
   controllers: [HealthController],
 })

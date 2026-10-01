@@ -2,7 +2,7 @@
 
 Sistema de administración + app web para gestión de colaboradores, inventario, tareas y finanzas.
 
-- Backend: NestJS + TypeORM + PostgreSQL + JWT (roles `ADMIN`/`USER`).
+- Backend: NestJS + TypeORM + PostgreSQL + JWT (roles `ADMIN`/`SUPERVISOR`/`USER`).
 - Frontend: React + Vite + TypeScript + Tailwind.
 - Realtime: Socket.IO.
 
@@ -66,19 +66,36 @@ Notas:
 - El `.env.example` histórico incluía Google Maps; ahora el mapa usa Mapbox (`VITE_MAPBOX_TOKEN`).
 
 ## Autenticación y roles
-- Registro: `POST /api/v1/auth/register` `{ name, email, password }`
+- No hay registro público: sólo un `ADMIN` crea cuentas (`POST /api/v1/users`).
 - Login: `POST /api/v1/auth/login` `{ email, password }`
-- Roles: `ADMIN`, `USER`
+- Roles:
+  - `ADMIN` (Administrador): acceso total, incluida la gestión de usuarios, clientes e inventario.
+  - `SUPERVISOR` (Supervisor): Asistencia, Finanzas, Tareas (y archivo), Mapa y Mensajes. Ve la lista de usuarios, pero no puede crearlos, editarlos, bloquearlos ni eliminarlos.
+  - `USER` (Colaborador): sus tareas, inventario (salidas), su corte de caja y mensajes.
 
 ## Módulos principales
 - Clientes: CRUD `/api/v1/customers`
 - Inventario: items, almacenes, stocks y movimientos `/api/v1/inventory/*`
 - Tareas: asignación y gestión `/api/v1/tasks`
 - Finanzas: corte de caja diario `/api/v1/finance/*`
+- Historial de cobros: consulta por cliente `/api/v1/historial/*` (ver abajo)
+
+## Historial de cobros
+Consulta de cobros históricos por cliente, en el menú "Historial de Cobros".
+- **Base de datos propia**: `internetperla_historial`, en el mismo servidor Postgres. La app la crea y le aplica sus migraciones al arrancar; si falla, sólo el historial responde 503 y el resto del CRM sigue funcionando.
+  - Variables opcionales `HIST_DB_HOST`, `HIST_DB_PORT`, `HIST_DB_USERNAME`, `HIST_DB_PASSWORD`, `HIST_DB_DATABASE`, `HIST_DB_SSL` o `HIST_DATABASE_URL`. Si faltan, se usan las `DB_*`.
+  - Crear la base requiere que el usuario de la DB tenga permiso `CREATEDB` (el superusuario de Docker lo tiene). Si no, créala a mano: `CREATE DATABASE internetperla_historial;`.
+  - Migraciones manuales: `npm run migration:run:historial` (o `migration:run:historial:prod`).
+- **Solo texto**: todos los datos (fechas, montos, meses…) se guardan tal cual vienen del archivo, sin convertirlos.
+- **Permisos**:
+  - `SUPERVISOR`: busca por nombre de cliente o código, ve su historial, lo descarga en CSV y lo imprime.
+  - `ADMIN`: además agrega, importa en lote (CSV/JSON con detección de duplicados), edita y elimina.
+  - `USER`: sin acceso.
+- Endpoints: `GET /historial/buscar?q=`, `GET /historial/cliente?nombre=`, `POST /historial`, `POST /historial/import`, `PATCH /historial/:id`, `DELETE /historial/:id`.
 
 ## Endpoints clave
 - `GET /api/v1/health` → `{ status: 'ok' }`
-- `POST /api/v1/auth/login`, `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
 
 ## Cuentas y credenciales
 
@@ -130,6 +147,8 @@ DataSource. No se ejecutan solas salvo que definas `DB_MIGRATIONS_RUN=true`.
 - `npm run migration:revert` — deshacer la última
 
 En producción usa `DB_SYNC=false` y aplica los cambios con `migration:run`.
+
+La base del historial tiene sus propias migraciones (`apps/backend/src/migrations-historial`), que la app aplica sola al arrancar.
 
 ## Despliegue en producción (VPS)
 

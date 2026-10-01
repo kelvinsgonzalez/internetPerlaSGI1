@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+import { isManager } from "../users/user.entity";
 import { AttendanceService } from "./attendance.service";
 import { CheckDto, CreateAttendanceDto } from "./dto";
 
@@ -35,9 +36,9 @@ export class AttendanceController {
   }
 
   @Get("summary") summary(@Req() req: AuthedRequest, @Query("name") name?: string) {
-    // Un ADMIN puede consultar a cualquiera; el resto sólo su propio resumen.
+    // ADMIN y SUPERVISOR pueden consultar a cualquiera; el resto sólo su propio resumen.
     const own = req.user.name || req.user.email;
-    const target = req.user.role === "ADMIN" ? name || own : own;
+    const target = isManager(req.user.role) ? name || own : own;
     if (!target) throw new BadRequestException("name is required");
     return this.service.summary(target);
   }

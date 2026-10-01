@@ -13,6 +13,7 @@ import { PayrollAccrualsRepository } from "../../repositories/payroll-accruals.r
 import { PayrollItemsRepository } from "../../repositories/payroll-items.repository";
 import { PayrollPeriodsRepository } from "../../repositories/payroll-periods.repository";
 import { UsersRepository } from "../../repositories/users.repository";
+import { isManager } from "../users/user.entity";
 import { CashEntry } from "./cash-entry.entity";
 import {
   CashCutQueryDto,
@@ -172,9 +173,9 @@ export class FinanceService {
     { date, userId }: CashCutQueryDto,
     reqUser?: { userId: string; role?: string }
   ) {
-    // Aislar por usuario: si no es ADMIN, forzar su propio userId
+    // Aislar por usuario: si no es ADMIN/SUPERVISOR, forzar su propio userId
     const effectiveUserId =
-      reqUser?.role === "ADMIN" ? userId : reqUser?.userId;
+      isManager(reqUser?.role) ? userId : reqUser?.userId;
     const entries = await this.cash.listByDate(date, effectiveUserId);
     const summary = await this.cashSummary.findByDate(date);
     const toNum = (x: any) => (typeof x === "string" ? parseFloat(x) : x || 0);

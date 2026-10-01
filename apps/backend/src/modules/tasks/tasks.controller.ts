@@ -20,6 +20,7 @@ import { diskStorage } from "multer";
 import { v4 as uuidv4 } from "uuid";
 import { Roles } from "../auth/roles.decorator";
 import { RolesGuard } from "../auth/roles.guard";
+import { isManager, MANAGEMENT_ROLES } from "../users/user.entity";
 import { CreateTaskDto, UpdateTaskDto } from "./dto";
 import { TasksService } from "./tasks.service";
 
@@ -63,7 +64,7 @@ export class TasksController {
   constructor(private service: TasksService) {}
 
   @Post()
-  @Roles("ADMIN")
+  @Roles(...MANAGEMENT_ROLES)
   create(@Body() dto: CreateTaskDto, @Req() req: any) {
     return this.service.create(dto, req.user.userId);
   }
@@ -75,10 +76,9 @@ export class TasksController {
     @Query("assignedToId") assignedToId?: string,
     @Query("customerId") customerId?: string
   ) {
-    const role = req.user?.role as "ADMIN" | "USER";
     const uid = req.user?.userId as string;
     const filters = { status, assignedToId, customerId };
-    if (role === "ADMIN") return this.service.listAll(filters);
+    if (isManager(req.user?.role)) return this.service.listAll(filters);
     return this.service.listForUser(uid, { status, customerId });
   }
 
@@ -99,7 +99,7 @@ export class TasksController {
   }
 
   @Post(":id/archive")
-  @Roles("ADMIN")
+  @Roles(...MANAGEMENT_ROLES)
   archive(@Param("id") id: string, @Req() req: any) {
     return this.service.archive(id, req.user.userId);
   }
@@ -114,7 +114,7 @@ export class TasksController {
   }
 
   @Delete(":id")
-  @Roles("ADMIN")
+  @Roles(...MANAGEMENT_ROLES)
   remove(@Param("id") id: string) {
     return this.service.remove(id);
   }

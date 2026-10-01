@@ -8,10 +8,11 @@ import { LoadingState } from '../components/ip/LoadingState';
 import { useAuth } from '../hooks/useAuth';
 import { useSocket } from '../hooks/useSocket';
 import api from '../services/api';
+import { isManager, type Role } from '../services/roles';
 
 type CashSummary = { id: string; date: string; incomes: number | string; expenses: number | string; balance: number | string; createdAt: string; closedBy?: string };
 type CashEntry = { id: string; entryDate: string; type: 'INCOME' | 'EXPENSE'; description: string; amount: number | string; createdAt: string; createdBy?: string; createdById?: string; createdByName?: string };
-type User = { id: string; email: string; name?: string; role: 'ADMIN' | 'USER' };
+type User = { id: string; email: string; name?: string; role: Role };
 
 const glassCard = 'backdrop-blur-xl bg-white/80 shadow-xl shadow-emerald-100/60 border border-white/30';
 
@@ -63,7 +64,7 @@ export default function Finance() {
       setError(undefined);
       const s = await fetchSummaries(filterMode, baseDate, selectedUserId);
       setSummaries(normalizeSummaries(s));
-      if (authUser?.role === 'ADMIN') {
+      if (isManager(authUser?.role)) {
         const { data } = await api.get('/users');
         setUsers(Array.isArray(data?.value || data) ? (data?.value || data) : []);
       }
@@ -113,7 +114,7 @@ export default function Finance() {
       setDetailLoading(true);
       setDetailError(undefined);
       const params: any = { date };
-      if (authUser?.role === 'ADMIN' && selectedUserId) params.userId = selectedUserId;
+      if (isManager(authUser?.role) && selectedUserId) params.userId = selectedUserId;
       const { data } = await api.get('/finance/cash-cut', { params });
       const entries = (data.entries || []).map((e: any) => ({ ...e, amount: typeof e.amount === 'string' ? parseFloat(e.amount) : e.amount }));
       setDetailEntries(entries);
@@ -130,7 +131,7 @@ export default function Finance() {
       setMovementsLoading(true);
       setMovementsError(undefined);
       const params: any = {};
-      if (authUser?.role === 'ADMIN' && selectedUserId) params.userId = selectedUserId;
+      if (isManager(authUser?.role) && selectedUserId) params.userId = selectedUserId;
       if (filterMode === 'DAY') {
         params.date = date;
         const { data } = await api.get('/finance/cash-cut', { params });
@@ -207,7 +208,7 @@ export default function Finance() {
                 <option value="WEEK">Semana</option>
               </select>
               <input type="date" className="rounded-full border border-emerald-200/70 bg-white px-4 py-2 text-xs font-semibold text-emerald-700 shadow-inner focus:border-emerald-400 focus:outline-none" value={baseDate} onChange={(e) => setBaseDate(e.target.value)} />
-              {authUser?.role === 'ADMIN' && (
+              {isManager(authUser?.role) && (
                 <select className="rounded-full border border-emerald-200/70 bg-white px-4 py-2 text-xs font-semibold text-emerald-700 shadow-inner focus:border-emerald-400 focus:outline-none" value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} title="Filtrar por usuario">
                   <option value="">Todos los usuarios</option>
                   {users.filter((u) => u.role === 'USER').map((u) => (<option key={u.id} value={u.id}>{u.name || u.email}</option>))}

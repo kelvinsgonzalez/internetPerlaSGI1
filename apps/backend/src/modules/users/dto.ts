@@ -59,3 +59,12 @@ export class ChangePasswordDto {
   @Matches(PASSWORD_REGEX, { message: PASSWORD_RULE_MESSAGE })
   newPassword: string;
 }
+
+/** Cambio de correo propio: también exige la contraseña actual. */
+export class ChangeEmailDto {
+  @IsString()
+  currentPassword: string;
+
+  @IsEmail()
+  email: string;
+}

@@ -4,8 +4,9 @@ import { toast } from 'sonner';
 import { UserPlus, Users, Edit, Trash2, X, Check, AtSign, KeyRound, User } from 'lucide-react';
 
 import api from '../services/api';
+import type { Role } from '../services/roles';
 
-type WorkerUser = { id: string; email: string; name?: string; role: 'ADMIN' | 'USER' };
+type WorkerUser = { id: string; email: string; name?: string; role: Role };
 
 const glassCard =
   'backdrop-blur-xl bg-white/80 shadow-xl shadow-emerald-100/60 border border-white/30';

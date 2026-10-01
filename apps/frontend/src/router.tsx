@@ -2,15 +2,19 @@ import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { useLocationTracking } from "./hooks/useLocationTracking";
+import { ReleasesProvider } from "./hooks/useReleases";
+import { isManager, MANAGEMENT_ROLES, type Role } from "./services/roles";
 
 import AdminShell from "./components/AdminShell";
 import Navbar from "./components/Navbar";
 import AdminPanel from "./pages/AdminPanel";
 import AdminSettings from "./pages/AdminSettings";
+import AuditLog from "./pages/AuditLog";
 import Attendance from "./pages/Attendance";
 import CashCut from "./pages/CashCut";
 import Dashboard from "./pages/Dashboard";
 import Finance from "./pages/Finance";
+import Historial from "./pages/Historial";
 import InventoryHome from "./pages/InventoryHome";
 import InventoryStatus from "./pages/InventoryStatus";
 import InventoryMovements from "./pages/InventoryMovements";
@@ -19,7 +23,7 @@ import LoginPage from "./pages/LoginPage";
 import MessagesPage from "./pages/Messages";
 import MyTasks from "./pages/MyTasks";
 import Profile from "./pages/Profile";
-import RegisterPage from "./pages/RegisterPage";
+import ReleasesAdmin from "./pages/ReleasesAdmin";
 import TaskArchive from "./pages/TaskArchive";
 import TasksAdmin from "./pages/TasksAdmin";
 import Workers from "./pages/Workers";
@@ -37,7 +41,11 @@ function RootLayout() {
 
 function AppLogic() {
   useLocationTracking();
-  return <RootLayout />;
+  return (
+    <ReleasesProvider>
+      <RootLayout />
+    </ReleasesProvider>
+  );
 }
 
 function WithAuth() {
@@ -50,20 +58,22 @@ function WithAuth() {
 
 function Protected({
   children,
-  role,
+  roles,
 }: {
   children: JSX.Element;
-  role?: "ADMIN" | "USER";
+  roles?: Role[];
 }) {
   const { user, initializing } = useAuth();
   if (initializing) return null;
   if (!user) return <Navigate to="/login" replace />;
-  if (role && user.role !== role) return <Navigate to="/" replace />;
+  if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />;
   return children;
 }
 
 function AdminSwitch() {
   const { user } = useAuth();
+  // El SUPERVISOR no tiene Dashboard: entra directo a su primer módulo.
+  if (user?.role === "SUPERVISOR") return <Navigate to="/attendance" replace />;
   if (user?.role === "ADMIN")
     return (
       <AdminShell>
@@ -80,7 +90,7 @@ function AdminSwitch() {
 
 function MessagesRoute() {
   const { user } = useAuth();
-  if (user?.role === "ADMIN")
+  if (isManager(user?.role))
     return (
       <AdminShell>
         <MessagesPage />
@@ -98,6 +108,8 @@ function InventoryRoute({ children }: { children: JSX.Element }) {
   const { user } = useAuth();
   if (user?.role === "ADMIN")
     return <AdminShell>{children}</AdminShell>;
+  // El SUPERVISOR no tiene acceso al módulo de Inventario.
+  if (user?.role === "SUPERVISOR") return <Navigate to="/" replace />;
   return (
     <>
       <Navbar />
@@ -108,8 +120,8 @@ function InventoryRoute({ children }: { children: JSX.Element }) {
 
 function FinanceRoute() {
   const { user } = useAuth();
-  // ADMIN ve el módulo completo de Finanzas en AdminShell, USER ve el corte de caja con Navbar
-  if (user?.role === "ADMIN")
+  // ADMIN/SUPERVISOR ven el módulo completo de Finanzas en AdminShell, USER ve el corte de caja con Navbar
+  if (isManager(user?.role))
     return (
       <AdminShell>
         <Finance />
@@ -143,11 +155,10 @@ export const router = createBrowserRouter(
           ),
         },
         { path: "login", element: <LoginPage /> },
-        { path: "register", element: <RegisterPage /> },
         {
           path: "workers",
           element: (
-            <Protected role="ADMIN">
+            <Protected roles={["ADMIN"]}>
               <AdminShell>
                 <Workers />
               </AdminShell>
@@ -176,7 +187,7 @@ export const router = createBrowserRouter(
         {
           path: "admin-settings",
           element: (
-            <Protected role="ADMIN">
+            <Protected roles={["ADMIN"]}>
               <AdminShell>
                 <AdminSettings />
               </AdminShell>
@@ -186,7 +197,7 @@ export const router = createBrowserRouter(
         {
           path: "attendance",
           element: (
-            <Protected role="ADMIN">
+            <Protected roles={MANAGEMENT_ROLES}>
               <AdminShell>
                 <Attendance />
               </AdminShell>
@@ -196,7 +207,7 @@ export const router = createBrowserRouter(
         {
           path: "admin/clientes",
           element: (
-            <Protected role="ADMIN">
+            <Protected roles={["ADMIN"]}>
               <AdminShell>
                 <ClientesAdminPage />
               </AdminShell>
@@ -236,7 +247,7 @@ export const router = createBrowserRouter(
         {
           path: "inventory/config",
           element: (
-            <Protected role="ADMIN">
+            <Protected roles={["ADMIN"]}>
               <AdminShell>
                 <InventoryConfig />
               </AdminShell>
@@ -265,7 +276,7 @@ export const router = createBrowserRouter(
         {
           path: "tasks-admin",
           element: (
-            <Protected role="ADMIN">
+            <Protected roles={MANAGEMENT_ROLES}>
               <AdminShell>
                 <TasksAdmin />
               </AdminShell>
@@ -275,7 +286,7 @@ export const router = createBrowserRouter(
         {
           path: "archivo-tareas",
           element: (
-            <Protected role="ADMIN">
+            <Protected roles={MANAGEMENT_ROLES}>
               <AdminShell>
                 <TaskArchive />
               </AdminShell>
@@ -296,9 +307,39 @@ export const router = createBrowserRouter(
         {
           path: "mapa-de-ubicacion",
           element: (
-            <Protected role="ADMIN">
+            <Protected roles={MANAGEMENT_ROLES}>
               <AdminShell>
                 <WorkersMap />
+              </AdminShell>
+            </Protected>
+          ),
+        },
+        {
+          path: "historial",
+          element: (
+            <Protected roles={MANAGEMENT_ROLES}>
+              <AdminShell>
+                <Historial />
+              </AdminShell>
+            </Protected>
+          ),
+        },
+        {
+          path: "auditoria",
+          element: (
+            <Protected roles={["ADMIN"]}>
+              <AdminShell>
+                <AuditLog />
+              </AdminShell>
+            </Protected>
+          ),
+        },
+        {
+          path: "versiones",
+          element: (
+            <Protected roles={["ADMIN"]}>
+              <AdminShell>
+                <ReleasesAdmin />
               </AdminShell>
             </Protected>
           ),

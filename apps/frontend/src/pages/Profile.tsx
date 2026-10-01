@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { User, Mail, Shield } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { ROLE_LABEL } from '../services/roles';
 
 const glassCard = 'backdrop-blur-xl bg-white/80 shadow-xl shadow-emerald-100/60 border border-white/30';
 
@@ -53,7 +54,7 @@ export default function Profile(){
           <div className="space-y-4">
             <InfoCard icon={User} label="Nombre" value={user?.name} />
             <InfoCard icon={Mail} label="Correo Electrónico" value={user?.email} />
-            <InfoCard icon={Shield} label="Rol" value={user?.role} />
+            <InfoCard icon={Shield} label="Rol" value={user?.role ? ROLE_LABEL[user.role] : undefined} />
           </div>
         </motion.div>
       </div>

@@ -3,8 +3,18 @@ import { decimalTransformer } from "../../common/decimal.transformer";
 
 export enum Role {
   ADMIN = "ADMIN",
+  SUPERVISOR = "SUPERVISOR",
   USER = "USER",
 }
+
+/**
+ * Roles con acceso a los módulos de gestión (Asistencia, Finanzas, Tareas,
+ * Mapa y Mensajes). La administración de usuarios, clientes e inventario
+ * sigue siendo exclusiva de ADMIN.
+ */
+export const MANAGEMENT_ROLES = [Role.ADMIN, Role.SUPERVISOR];
+export const isManager = (role?: string) =>
+  role === Role.ADMIN || role === Role.SUPERVISOR;
 
 @Entity()
 @Unique(["email"])
@@ -66,4 +76,9 @@ export class User {
   // sesiones abiertas con el token anterior.
   @Column({ type: 'timestamptz', nullable: true })
   passwordChangedAt?: Date | null;
+
+  // Última vez que el usuario leyó las Novedades. Las versiones publicadas
+  // después de esta fecha se le muestran como pendientes.
+  @Column({ type: 'timestamptz', nullable: true })
+  releasesSeenAt?: Date | null;
 }

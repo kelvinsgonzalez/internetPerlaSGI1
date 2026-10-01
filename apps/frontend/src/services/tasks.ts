@@ -1,4 +1,5 @@
 import api from "./api";
+import type { Role } from "./roles";
 
 export type TaskStatus = "PENDIENTE" | "EN_PROCESO" | "COMPLETADA" | "OBJETADA";
 
@@ -6,7 +7,7 @@ export interface UserRef {
   id: string;
   email: string;
   name?: string;
-  role: "ADMIN" | "USER";
+  role: Role;
 }
 
 export interface CustomerRef {

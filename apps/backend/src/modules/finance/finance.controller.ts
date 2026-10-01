@@ -12,6 +12,7 @@ import {
 import { AuthGuard } from "@nestjs/passport";
 import { Roles } from "../auth/roles.decorator";
 import { RolesGuard } from "../auth/roles.guard";
+import { MANAGEMENT_ROLES } from "../users/user.entity";
 import {
   CashCutQueryDto,
   CloseDayDto,
@@ -34,48 +35,48 @@ import { FinanceService } from "./finance.service";
 export class FinanceController {
   constructor(private service: FinanceService) {}
 
-  @Get("periods") @Roles("ADMIN") listPeriods() {
+  @Get("periods") @Roles(...MANAGEMENT_ROLES) listPeriods() {
     return this.service.listPeriods();
   }
-  @Post("periods") @Roles("ADMIN") createPeriod(@Body() dto: CreatePeriodDto) {
+  @Post("periods") @Roles(...MANAGEMENT_ROLES) createPeriod(@Body() dto: CreatePeriodDto) {
     return this.service.createPeriod(dto);
   }
-  @Patch("periods/:id/status") @Roles("ADMIN") updatePeriodStatus(
+  @Patch("periods/:id/status") @Roles(...MANAGEMENT_ROLES) updatePeriodStatus(
     @Param("id") id: string,
     @Body() dto: UpdatePeriodStatusDto
   ) {
     return this.service.updatePeriodStatus(id, dto);
   }
 
-  @Get("payroll-items") @Roles("ADMIN") listPayrollItems() {
+  @Get("payroll-items") @Roles(...MANAGEMENT_ROLES) listPayrollItems() {
     return this.service.listPayrollItems();
   }
-  @Post("payroll-items") @Roles("ADMIN") addPayrollItem(
+  @Post("payroll-items") @Roles(...MANAGEMENT_ROLES) addPayrollItem(
     @Body() dto: CreatePayrollItemDto
   ) {
     return this.service.addPayrollItem(dto);
   }
 
-  @Get("loans") @Roles("ADMIN") listLoans() {
+  @Get("loans") @Roles(...MANAGEMENT_ROLES) listLoans() {
     return this.service.listLoans();
   }
-  @Post("loans") @Roles("ADMIN") createLoan(@Body() dto: CreateLoanDto) {
+  @Post("loans") @Roles(...MANAGEMENT_ROLES) createLoan(@Body() dto: CreateLoanDto) {
     return this.service.createLoan(dto);
   }
-  @Patch("loans/:id/balance") @Roles("ADMIN") updateLoanBalance(
+  @Patch("loans/:id/balance") @Roles(...MANAGEMENT_ROLES) updateLoanBalance(
     @Param("id") id: string,
     @Body() dto: UpdateLoanBalanceDto
   ) {
     return this.service.updateLoanBalance(id, dto);
   }
 
-  @Get("debts") @Roles("ADMIN") listDebts() {
+  @Get("debts") @Roles(...MANAGEMENT_ROLES) listDebts() {
     return this.service.listDebts();
   }
-  @Post("debts") @Roles("ADMIN") createDebt(@Body() dto: CreateDebtDto) {
+  @Post("debts") @Roles(...MANAGEMENT_ROLES) createDebt(@Body() dto: CreateDebtDto) {
     return this.service.createDebt(dto);
   }
-  @Patch("debts/:id/balance") @Roles("ADMIN") updateDebtBalance(
+  @Patch("debts/:id/balance") @Roles(...MANAGEMENT_ROLES) updateDebtBalance(
     @Param("id") id: string,
     @Body() dto: UpdateDebtBalanceDto
   ) {
@@ -111,18 +112,18 @@ export class FinanceController {
 
   // Resúmenes (ADMIN)
   @Get("cash-summaries")
-  @Roles("ADMIN")
+  @Roles(...MANAGEMENT_ROLES)
   summaries(@Query() q: DateRangeDto) {
     return this.service.listDailySummaries(q.from, q.to, q.userId);
   }
   // Agregado diario desde movimientos (incluye días sin cierre)
   @Get("cash-daily")
-  @Roles("ADMIN")
+  @Roles(...MANAGEMENT_ROLES)
   cashDaily(@Query() q: DateRangeDto) {
     return this.service.listDailyAggregates(q.from, q.to);
   }
   @Post("cash-summaries/close-day")
-  @Roles("ADMIN")
+  @Roles(...MANAGEMENT_ROLES)
   closeDay(@Body() dto: CloseDayDto, @Req() req: any) {
     return this.service.persistDailySummary(
       dto.date,
@@ -133,7 +134,7 @@ export class FinanceController {
 
   // Alias para simplificar nombre del endpoint
   @Post("close-day")
-  @Roles("ADMIN")
+  @Roles(...MANAGEMENT_ROLES)
   closeDayAlias(@Body() dto: CloseDayDto, @Req() req: any) {
     return this.service.persistDailySummary(
       dto.date,
@@ -144,26 +145,26 @@ export class FinanceController {
 
   // Sueldos del día (ADMIN)
   @Get("daily-salaries")
-  @Roles("ADMIN")
+  @Roles(...MANAGEMENT_ROLES)
   listDailySalaries(@Query("date") date: string) {
     return this.service.getDailySalaryCandidates(date);
   }
 
   @Get("daily-salaries/accruals")
-  @Roles("ADMIN")
+  @Roles(...MANAGEMENT_ROLES)
   listDailySalaryAccruals(@Query("date") date: string) {
     return this.service.listSalaryAccruals(date);
   }
 
   // Reapertura de día (ADMIN)
   @Post("reopen-day")
-  @Roles("ADMIN")
+  @Roles(...MANAGEMENT_ROLES)
   reopenDay(@Body() dto: ReopenDayDto) {
     return this.service.reopenDay(dto.date);
   }
 
   @Get("payroll-summary")
-  @Roles("ADMIN")
+  @Roles(...MANAGEMENT_ROLES)
   payrollSummary(@Query("from") from?: string, @Query("to") to?: string) {
     // Default Monday-Sunday
     const now = new Date();
@@ -183,7 +184,7 @@ export class FinanceController {
   }
 
   @Get("weekly-attendance")
-  @Roles("ADMIN")
+  @Roles(...MANAGEMENT_ROLES)
   weeklyAttendance(@Query("from") from?: string, @Query("to") to?: string) {
     // Default Monday-Sunday
     const now = new Date();

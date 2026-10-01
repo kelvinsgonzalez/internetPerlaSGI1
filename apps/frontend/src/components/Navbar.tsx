@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { ReleasesButton } from "../hooks/useReleases";
 import { Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -35,6 +36,34 @@ export default function Navbar() {
           </Link>
           <Link to="/tasks-admin" className={linkClasses} onClick={handleLinkClick}>
             Tareas
+          </Link>
+          <Link to="/historial" className={linkClasses} onClick={handleLinkClick}>
+            Historial
+          </Link>
+          <Link to="/messages" className={linkClasses} onClick={handleLinkClick}>
+            Mensajes
+          </Link>
+        </>
+      );
+    }
+
+    if (user?.role === "SUPERVISOR") {
+      return (
+        <>
+          <Link to="/attendance" className={linkClasses} onClick={handleLinkClick}>
+            Asistencia
+          </Link>
+          <Link to="/finanzas" className={linkClasses} onClick={handleLinkClick}>
+            Finanzas
+          </Link>
+          <Link to="/tasks-admin" className={linkClasses} onClick={handleLinkClick}>
+            Tareas
+          </Link>
+          <Link to="/mapa-de-ubicacion" className={linkClasses} onClick={handleLinkClick}>
+            Mapa
+          </Link>
+          <Link to="/historial" className={linkClasses} onClick={handleLinkClick}>
+            Historial
           </Link>
           <Link to="/messages" className={linkClasses} onClick={handleLinkClick}>
             Mensajes
@@ -91,13 +120,15 @@ export default function Navbar() {
             <Link to="/profile" className="text-white/80 hover:text-white">
               Perfil
             </Link>
+            <ReleasesButton />
             <span className="text-white/80">{user?.email}</span>
             <button onClick={logout} className="text-red-100 transition hover:text-white">
               Salir
             </button>
           </nav>
 
-          <div className="md:hidden">
+          <div className="flex items-center gap-2 md:hidden">
+            <ReleasesButton />
             <button onClick={() => setIsOpen(!isOpen)} className="text-white">
               {isOpen ? <X size={24} /> : <Menu size={24} />}
             </button>

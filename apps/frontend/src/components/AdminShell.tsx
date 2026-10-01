@@ -6,12 +6,15 @@ import {
   ClipboardList,
   Clock,
   DollarSign,
+  History,
   Home,
   LogOut,
   Map,
   Menu,
   MessageSquare,
+  Rocket,
   Settings,
+  ShieldCheck,
   Users,
   Users2,
   X,
@@ -27,6 +30,8 @@ import {
 import { createPortal } from "react-dom";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { ReleasesButton } from "../hooks/useReleases";
+import type { Role } from "../services/roles";
 import { useSocket } from "../hooks/useSocket";
 import api from "../services/api";
 import { listContacts, type Contact } from "../services/messages";
@@ -66,18 +71,25 @@ interface Task {
 const getTimestamp = (value?: string) =>
   value ? new Date(value).getTime() : 0;
 
-const navItems = [
-  { to: "/", label: "Dashboard", icon: Home },
+// `adminOnly` oculta el módulo al SUPERVISOR (las rutas también lo bloquean).
+const navItems: { to: string; label: string; icon: typeof Home; adminOnly?: boolean }[] = [
+  { to: "/", label: "Dashboard", icon: Home, adminOnly: true },
   { to: "/attendance", label: "Asistencia", icon: Clock },
   { to: "/finance", label: "Finanzas", icon: DollarSign },
-  { to: "/inventory", label: "Inventario", icon: Boxes },
+  { to: "/inventory", label: "Inventario", icon: Boxes, adminOnly: true },
   { to: "/tasks-admin", label: "Tareas", icon: ClipboardList },
   { to: "/archivo-tareas", label: "Archivo de Tareas", icon: Archive },
-  { to: "/admin/clientes", label: "Clientes", icon: Users },
-  { to: "/workers", label: "Trabajadores", icon: Users2 },
+  { to: "/admin/clientes", label: "Clientes", icon: Users, adminOnly: true },
+  { to: "/workers", label: "Trabajadores", icon: Users2, adminOnly: true },
   { to: "/mapa-de-ubicacion", label: "Mapa de Ubicacion", icon: Map },
+  { to: "/historial", label: "Historial de Cobros", icon: History },
   { to: "/messages", label: "Mensajes", icon: MessageSquare },
+  { to: "/auditoria", label: "Bitácora de auditoría", icon: ShieldCheck, adminOnly: true },
+  { to: "/versiones", label: "Versiones", icon: Rocket, adminOnly: true },
 ];
+
+const navItemsFor = (role?: Role) =>
+  navItems.filter((item) => !item.adminOnly || role === "ADMIN");
 
 export function NotificationBell() {
   const { user } = useAuth();
@@ -511,7 +523,7 @@ export default function AdminShell({ children }: PropsWithChildren) {
         )}
       </div>
       <nav className="relative flex flex-col gap-1">
-        {navItems.map(({ to, label, icon: Icon }) => (
+        {navItemsFor(user?.role).map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to} className={linkCls} end={to === "/"} onClick={handleNavLinkClick}>
             <motion.span
               className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 transition group-hover:bg-white/10"
@@ -525,6 +537,8 @@ export default function AdminShell({ children }: PropsWithChildren) {
         ))}
       </nav>
       <div className="relative mt-auto flex flex-col gap-2 border-t border-white/10 pt-4">
+        <ReleasesButton variant="menu" />
+        {user?.role === "ADMIN" && (
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.97 }}
@@ -539,6 +553,7 @@ export default function AdminShell({ children }: PropsWithChildren) {
           </span>
           <span className="font-medium">Configuracion</span>
         </motion.button>
+        )}
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.97 }}
@@ -615,6 +630,7 @@ export default function AdminShell({ children }: PropsWithChildren) {
             <span className="text-base font-semibold drop-shadow-sm">Internet Perla</span>
           </div>
           <div className="flex items-center gap-2">
+            <ReleasesButton />
             <NotificationBell />
             <button onClick={() => setMobileMenuOpen(true)} className="text-white">
               <Menu size={24} />
