@@ -1,8 +1,10 @@
 ﻿import { AnimatePresence, motion } from "framer-motion";
 import {
   Archive,
+  Ban,
   Bell,
   Boxes,
+  CalendarDays,
   ClipboardList,
   Clock,
   DollarSign,
@@ -29,14 +31,16 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Link, NavLink, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { useAuth } from "../hooks/useAuth";
 import { ReleasesButton } from "../hooks/useReleases";
 import type { Role } from "../services/roles";
 import { useSocket } from "../hooks/useSocket";
 import api from "../services/api";
 import { listContacts, type Contact } from "../services/messages";
+import { listarSuspensiones, resumenAgenda } from "../services/suspensiones";
 
-type AdminNotificationType = "inventory" | "tasks" | "messages";
+type AdminNotificationType = "inventory" | "tasks" | "messages" | "suspensiones" | "agenda";
 
 interface NotificationItem {
   id: AdminNotificationType;
@@ -83,6 +87,8 @@ const navItems: { to: string; label: string; icon: typeof Home; adminOnly?: bool
   { to: "/workers", label: "Trabajadores", icon: Users2, adminOnly: true },
   { to: "/mapa-de-ubicacion", label: "Mapa de Ubicacion", icon: Map },
   { to: "/historial", label: "Historial de Cobros", icon: History },
+  { to: "/suspensiones", label: "Suspensiones", icon: Ban },
+  { to: "/agenda", label: "Agenda", icon: CalendarDays },
   { to: "/messages", label: "Mensajes", icon: MessageSquare },
   { to: "/auditoria", label: "Bitácora de auditoría", icon: ShieldCheck, adminOnly: true },
   { to: "/versiones", label: "Versiones", icon: Rocket, adminOnly: true },
@@ -278,6 +284,51 @@ export function NotificationBell() {
         });
       }
 
+      // Suspensiones y agenda viven en otra base: si fallan, el resto del panel sigue.
+      const [suspRes, agendaRes] = await Promise.all([
+        listarSuspensiones({ vista: "activas" }).catch(() => null),
+        resumenAgenda().catch(() => null),
+      ]);
+
+      if (suspRes) {
+        const seenSusp = readSeen("suspensiones");
+        const nuevas = suspRes.items.filter((s) => getTimestamp(s.createdAt) > seenSusp.time);
+        const latestSuspTs = suspRes.items.reduce((max, s) => Math.max(max, getTimestamp(s.createdAt)), 0);
+        const signature = `revisar:${suspRes.porRevisar}`;
+        if (nuevas.length > 0 || (suspRes.porRevisar > 0 && signature !== seenSusp.signature)) {
+          const partes = [
+            nuevas.length ? `${nuevas.length} nueva${nuevas.length === 1 ? "" : "s"}` : null,
+            suspRes.porRevisar ? `${suspRes.porRevisar} por revisar` : null,
+          ].filter(Boolean);
+          notifications.push({
+            id: "suspensiones",
+            title: `Suspensiones: ${partes.join(", ")}`,
+            description: nuevas.length
+              ? `Clientes anunciados: ${nuevas.map((s) => s.clienteNombre).slice(0, 3).join(", ")}`
+              : "Hay asignaciones devueltas por los trabajadores esperando tu revisión.",
+            createdAt: new Date(latestSuspTs || Date.now()).toISOString(),
+            count: nuevas.length + suspRes.porRevisar,
+            route: "/suspensiones",
+            signature,
+          });
+        }
+      }
+
+      if (agendaRes && agendaRes.hoy + agendaRes.vencidos > 0) {
+        const signature = `${agendaRes.fecha}|${agendaRes.hoy}|${agendaRes.vencidos}`;
+        if (signature !== readSeen("agenda").signature) {
+          notifications.push({
+            id: "agenda",
+            title: `Agenda: ${agendaRes.hoy} para hoy${agendaRes.vencidos ? `, ${agendaRes.vencidos} vencido${agendaRes.vencidos === 1 ? "" : "s"}` : ""}`,
+            description: "Recordatorios de cobros, visitas y seguimientos de suspensiones.",
+            createdAt: new Date().toISOString(),
+            count: agendaRes.hoy + agendaRes.vencidos,
+            route: "/agenda",
+            signature,
+          });
+        }
+      }
+
       setPendingCount(notifications.length);
       if (openRef.current) {
         setItems(notifications);
@@ -303,10 +354,34 @@ export function NotificationBell() {
     socket.on("task:created", refresh);
     socket.on("task:updated", refresh);
     socket.on("message:created", refresh);
+    const onSuspension = (p: { clienteNombre?: string; creadoPor?: string }) => {
+      toast.info(`Nueva suspensión: ${p?.clienteNombre ?? ""}`, {
+        description: p?.creadoPor ? `Anunciada por ${p.creadoPor}` : undefined,
+      });
+      refresh();
+    };
+    const onDevuelta = (p: { cliente?: string; trabajador?: string }) => {
+      toast.info(`${p?.trabajador ?? "Un trabajador"} entregó su informe`, {
+        description: `${p?.cliente ?? ""} · pendiente de revisión en Suspensiones`,
+      });
+      refresh();
+    };
+    const onRecordatorio = (p: { hoy?: number; vencidos?: number }) => {
+      toast.warning(`Agenda: ${p?.hoy ?? 0} para hoy, ${p?.vencidos ?? 0} vencidos`);
+      refresh();
+    };
+    socket.on("suspension:created", onSuspension);
+    socket.on("suspension-asignacion:devuelta", onDevuelta);
+    socket.on("agenda:recordatorio", onRecordatorio);
+    socket.on("agenda:updated", refresh);
     return () => {
       socket.off("task:created", refresh);
       socket.off("task:updated", refresh);
       socket.off("message:created", refresh);
+      socket.off("suspension:created", onSuspension);
+      socket.off("suspension-asignacion:devuelta", onDevuelta);
+      socket.off("agenda:recordatorio", onRecordatorio);
+      socket.off("agenda:updated", refresh);
     };
   }, [socket, loadNotifications]);
 

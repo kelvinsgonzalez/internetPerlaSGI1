@@ -9,6 +9,7 @@ import AdminShell from "./components/AdminShell";
 import Navbar from "./components/Navbar";
 import AdminPanel from "./pages/AdminPanel";
 import AdminSettings from "./pages/AdminSettings";
+import AgendaSuspensiones from "./pages/AgendaSuspensiones";
 import AuditLog from "./pages/AuditLog";
 import Attendance from "./pages/Attendance";
 import CashCut from "./pages/CashCut";
@@ -21,9 +22,11 @@ import InventoryMovements from "./pages/InventoryMovements";
 import InventoryConfig from "./pages/InventoryConfig";
 import LoginPage from "./pages/LoginPage";
 import MessagesPage from "./pages/Messages";
+import MisAsignacionesSuspension from "./pages/MisAsignacionesSuspension";
 import MyTasks from "./pages/MyTasks";
 import Profile from "./pages/Profile";
 import ReleasesAdmin from "./pages/ReleasesAdmin";
+import Suspensiones from "./pages/Suspensiones";
 import TaskArchive from "./pages/TaskArchive";
 import TasksAdmin from "./pages/TasksAdmin";
 import Workers from "./pages/Workers";
@@ -321,6 +324,37 @@ export const router = createBrowserRouter(
               <AdminShell>
                 <Historial />
               </AdminShell>
+            </Protected>
+          ),
+        },
+        {
+          path: "suspensiones",
+          element: (
+            <Protected roles={MANAGEMENT_ROLES}>
+              <AdminShell>
+                <Suspensiones />
+              </AdminShell>
+            </Protected>
+          ),
+        },
+        {
+          path: "agenda",
+          element: (
+            <Protected roles={MANAGEMENT_ROLES}>
+              <AdminShell>
+                <AgendaSuspensiones />
+              </AdminShell>
+            </Protected>
+          ),
+        },
+        {
+          path: "mis-suspensiones",
+          element: (
+            <Protected roles={["USER"]}>
+              <>
+                <Navbar />
+                <MisAsignacionesSuspension />
+              </>
             </Protected>
           ),
         },

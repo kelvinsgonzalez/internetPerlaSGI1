@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { ArrowRight, ClipboardCheck, MessageSquare, DollarSign, Briefcase, User, LogOut, Server, CheckCircle } from 'lucide-react';
+import { ArrowRight, ClipboardCheck, MessageSquare, DollarSign, Briefcase, User, LogOut, Server, CheckCircle, Truck } from 'lucide-react';
 
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { useSocket } from '../hooks/useSocket';
 import { listContacts } from '../services/messages';
+import { misAsignaciones } from '../services/suspensiones';
 
 const glassCard = 'backdrop-blur-xl bg-white/80 shadow-xl shadow-emerald-100/60 border border-white/30';
 
@@ -41,6 +42,7 @@ export default function Dashboard(){
   const { user } = useAuth();
   const [pendingTasks, setPendingTasks] = useState<number>(0);
   const [unreadMessages, setUnreadMessages] = useState<number>(0);
+  const [visitasPendientes, setVisitasPendientes] = useState<number>(0);
   const [attendanceIn, setAttendanceIn] = useState<string>('No registrada');
   const [attendanceOut, setAttendanceOut] = useState<string>('No registrada');
   const [cashTotals, setCashTotals] = useState<{ income: number; expense: number; entries: number } | null>(null);
@@ -48,7 +50,13 @@ export default function Dashboard(){
 
   const isPending = (t: any) => t?.status === 'PENDIENTE' || t?.status === 'EN_PROCESO';
 
+  const loadVisitas = () => {
+    if (user?.role !== 'USER') return;
+    misAsignaciones().then(r => setVisitasPendientes(r.activas.length)).catch(() => setVisitasPendientes(0));
+  };
+
   const loadData = () => {
+    loadVisitas();
     api.get('/tasks/mine').then(r=>{
       const list = r.data || [];
       setPendingTasks((list as any[]).filter(isPending).length);
@@ -96,6 +104,11 @@ export default function Dashboard(){
     const onTaskUpdate = () => { api.get('/tasks/mine').then(r => setPendingTasks((r.data || []).filter(isPending).length)); };
 
     const onCashChange = () => loadData();
+    const onVisitaCreada = (p: { tipo?: string; cliente?: string }) => {
+      toast.info(`Nueva ${p?.tipo === 'RECOGER_EQUIPO' ? 'recolección de equipo' : 'visita'}${p?.cliente ? `: ${p.cliente}` : ''}`);
+      loadVisitas();
+    };
+    const onVisitaActualizada = () => loadVisitas();
 
     socket.on('attendance:created', onNewAttendance);
     socket.on('message:created', onNewMessage);
@@ -105,6 +118,8 @@ export default function Dashboard(){
     socket.on('cash:day-closed', onCashChange);
     socket.on('cash:user-closed', onCashChange);
     socket.on('cash:day-reopened', onCashChange);
+    socket.on('suspension-asignacion:created', onVisitaCreada);
+    socket.on('suspension-asignacion:updated', onVisitaActualizada);
 
     return ()=>{
       socket.off('attendance:created', onNewAttendance);
@@ -115,6 +130,8 @@ export default function Dashboard(){
       socket.off('cash:day-closed', onCashChange);
       socket.off('cash:user-closed', onCashChange);
       socket.off('cash:day-reopened', onCashChange);
+      socket.off('suspension-asignacion:created', onVisitaCreada);
+      socket.off('suspension-asignacion:updated', onVisitaActualizada);
     };
   },[socket, user]);
 
@@ -162,6 +179,9 @@ export default function Dashboard(){
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <DashboardCard to="/my-tasks" icon={ClipboardCheck} title="Mis Tareas" subtitle={pendingTasks > 0 ? `${pendingTasks} pendiente${pendingTasks === 1 ? '' : 's'}` : 'Todo completado'} accentColor="bg-amber-500" delay={0.1} />
           <DashboardCard to="/messages" icon={MessageSquare} title="Mensajes" subtitle={`${unreadMessages} sin leer`} accentColor="bg-sky-500" delay={0.2} />
+          {user?.role === 'USER' && (
+            <DashboardCard to="/mis-suspensiones" icon={Truck} title="Visitas y recolecciones" subtitle={visitasPendientes > 0 ? `${visitasPendientes} pendiente${visitasPendientes === 1 ? '' : 's'}` : 'Sin pendientes'} accentColor="bg-indigo-500" delay={0.25} />
+          )}
           <DashboardCard
             to="/finance"
             icon={DollarSign}

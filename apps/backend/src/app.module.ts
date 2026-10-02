@@ -13,6 +13,7 @@ import { FinanceModule } from "./modules/finance/finance.module";
 import { HistorialModule } from "./modules/historial/historial.module";
 import { InventoryModule } from "./modules/inventory/inventory.module";
 import { MessagesModule } from "./modules/messages/messages.module";
+import { SuspensionesModule } from "./modules/suspensiones/suspensiones.module";
 import { TaskArchiveModule } from "./modules/task-archive/task-archive.module";
 import { TasksModule } from "./modules/tasks/tasks.module";
 import { UsersModule } from "./modules/users/users.module";
@@ -80,6 +81,7 @@ import { RepositoriesModule } from "./repositories/repositories.module";
     TasksModule,
     TaskArchiveModule,
     HistorialModule,
+    SuspensionesModule,
     AuditModule,
     ReleasesModule,
   ],

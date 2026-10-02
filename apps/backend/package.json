@@ -11,11 +11,13 @@
     "migration:revert": "ts-node ./node_modules/typeorm/cli.js migration:revert -d src/data-source.ts",
     "migration:show": "ts-node ./node_modules/typeorm/cli.js migration:show -d src/data-source.ts",
     "migration:run:historial": "ts-node ./node_modules/typeorm/cli.js migration:run -d src/data-source-historial.ts",
+    "migration:run:suspensiones": "ts-node ./node_modules/typeorm/cli.js migration:run -d src/data-source-suspensiones.ts",
     "seed:prod": "node dist/seed.js",
     "migration:run:prod": "node ./node_modules/typeorm/cli.js migration:run -d dist/data-source.js",
     "migration:revert:prod": "node ./node_modules/typeorm/cli.js migration:revert -d dist/data-source.js",
     "migration:show:prod": "node ./node_modules/typeorm/cli.js migration:show -d dist/data-source.js",
-    "migration:run:historial:prod": "node ./node_modules/typeorm/cli.js migration:run -d dist/data-source-historial.js"
+    "migration:run:historial:prod": "node ./node_modules/typeorm/cli.js migration:run -d dist/data-source-historial.js",
+    "migration:run:suspensiones:prod": "node ./node_modules/typeorm/cli.js migration:run -d dist/data-source-suspensiones.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

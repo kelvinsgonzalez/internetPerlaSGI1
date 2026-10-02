@@ -40,6 +40,9 @@ export default function Navbar() {
           <Link to="/historial" className={linkClasses} onClick={handleLinkClick}>
             Historial
           </Link>
+          <Link to="/suspensiones" className={linkClasses} onClick={handleLinkClick}>
+            Suspensiones
+          </Link>
           <Link to="/messages" className={linkClasses} onClick={handleLinkClick}>
             Mensajes
           </Link>
@@ -65,6 +68,9 @@ export default function Navbar() {
           <Link to="/historial" className={linkClasses} onClick={handleLinkClick}>
             Historial
           </Link>
+          <Link to="/suspensiones" className={linkClasses} onClick={handleLinkClick}>
+            Suspensiones
+          </Link>
           <Link to="/messages" className={linkClasses} onClick={handleLinkClick}>
             Mensajes
           </Link>
@@ -77,6 +83,9 @@ export default function Navbar() {
         <>
           <Link to="/my-tasks" className={linkClasses} onClick={handleLinkClick}>
             Mis Tareas
+          </Link>
+          <Link to="/mis-suspensiones" className={linkClasses} onClick={handleLinkClick}>
+            Visitas
           </Link>
           <Link to="/inventory" className={linkClasses} onClick={handleLinkClick}>
             Inventario
